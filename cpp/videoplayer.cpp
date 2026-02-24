@@ -1,15 +1,8 @@
-#include <QApplication>
-#include <QLabel>
-#include <QImage>
-#include <QPixmap>
 #include <QtWidgets>
 
 #include <QMediaPlayer>
 #include <QAudioOutput>
 #include <QVideoWidget>
-#include <QPushButton>
-#include <QVBoxLayout>
-#include <QFileDialog>
 
 #include <string>
 #include <iostream>
