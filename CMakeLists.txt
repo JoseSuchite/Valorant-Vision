@@ -20,7 +20,7 @@ find_package(OpenCV REQUIRED)
 # Your executable
 add_executable(Valorant-Vision
     "cpp/main.cpp"
- "cpp/videoplayer.cpp" "headers/videoplayer.h")
+ "cpp/videoplayer.cpp" "headers/videoplayer.h" "headers/mainwindow.h" "cpp/mainwindow.cpp")
 
 # Link Qt + OpenCV
 target_link_libraries(Valorant-Vision
