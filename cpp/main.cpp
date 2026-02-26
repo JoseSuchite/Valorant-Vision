@@ -1,12 +1,15 @@
-﻿#include <QApplication>
+﻿
+#include <QtWidgets>
+#include <QVBoxLayout>
+#include <QApplication>
 #include <QLabel>
 #include <QImage>
-
-#include <QtWidgets>
+#include <QPushButton>
+#include <QLayout>
 
 #include <opencv2/opencv.hpp>
 
-#include "../headers/videoplayer.h"
+#include "../headers/mainwindow.h"
 
 
 int main(int argc, char* argv[])
@@ -14,19 +17,12 @@ int main(int argc, char* argv[])
 
     QApplication app(argc, argv);
 
-    QMainWindow mainWindow;
-    mainWindow.setWindowTitle("Valorant-Vision");
-    mainWindow.resize(400, 300);
-    //mainWindow.setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-
+    MainWindow mainWindow;
     mainWindow.show();
+    //mainWindow.setWindowTitle("Valorant-Vision");
+   // mainWindow.resize(600, 400);
 
-    QWidget box(&mainWindow);
-    box.show();
-
-    VideoPlayer player(&mainWindow);
-    std::string source = "D:/Downloads 2/videoplayback.mp4";
-    player.displayVideo(source);
+    
 
     return app.exec();
 }
