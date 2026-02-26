@@ -30,6 +30,8 @@ MainWindow::MainWindow() :
         mainVerticalLayout->addWidget(chooseFileButton);
         mainVerticalLayout->addWidget(pauseButton);
 
+
+        player->hide();
         this->show();
 }
 
@@ -38,6 +40,7 @@ void MainWindow::openAndPlayVideoOnClick() {
     QString QSource = QFileDialog::getOpenFileName(this, tr("Open Video"), "C:", tr("*.mp4 *.mp3"));
     std::string source = QSource.toStdString();
 
+    player->show();
     player->displayVideo(source);
 }
 
