@@ -15,12 +15,18 @@ VideoPlayer::VideoPlayer(QWidget *parentAddress) :
 	player = new QMediaPlayer(this);
 	videoWidget = new QVideoWidget(this);
 	audioOutput = new QAudioOutput(this);
+	slider = new QSlider(Qt::Horizontal, this);
 
 	player->setVideoOutput(videoWidget);
 	player->setAudioOutput(audioOutput);
 
+	connect(player, &QMediaPlayer::durationChanged, slider, &QSlider::setMaximum);
+	connect(player, &QMediaPlayer::positionChanged, slider, &QSlider::setValue);
+	connect(slider, &QSlider::sliderMoved, player, &QMediaPlayer::setPosition);
+
 	QVBoxLayout *layout = new QVBoxLayout(this);
 	layout->addWidget(videoWidget);
+	layout->addWidget(slider);
 
 }
 

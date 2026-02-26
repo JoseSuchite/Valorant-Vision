@@ -6,6 +6,7 @@
 #include <QMediaPlayer>
 #include <QAudioOutput>
 #include <QVideoWidget>
+#include <QSlider>
 
 class VideoPlayer : public QWidget {
 
@@ -13,6 +14,7 @@ private:
 	QMediaPlayer *player;
 	QVideoWidget *videoWidget;
 	QAudioOutput *audioOutput;
+	QSlider *slider;
 
 public:
 	// Takes in a pointer to the parent object
