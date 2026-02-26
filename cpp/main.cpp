@@ -20,7 +20,7 @@ int main(int argc, char* argv[])
     MainWindow mainWindow;
     mainWindow.show();
     //mainWindow.setWindowTitle("Valorant-Vision");
-   // mainWindow.resize(600, 400);
+    //mainWindow.resize(600, 400);
 
     
 
