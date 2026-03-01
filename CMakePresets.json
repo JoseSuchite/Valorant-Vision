@@ -6,8 +6,8 @@
       "hidden": true,
       "generator": "Visual Studio 17 2022",
       "toolset": "v142",
-      "binaryDir": "${sourceDir}/out/build/${presetName}",
-      "installDir": "${sourceDir}/out/install/${presetName}",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "installDir": "${sourceDir}/install/${presetName}",
       "condition": {
         "type": "equals",
         "lhs": "${hostSystemName}",

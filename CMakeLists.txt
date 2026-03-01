@@ -6,13 +6,9 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
-# Tell CMake where Qt6 is installed
-set(CMAKE_PREFIX_PATH "$ENV{CMAKE_COMPILER_DIR}")
 
 # Find Qt6
-find_package(Qt6 COMPONENTS Widgets REQUIRED)
-find_package(Qt6 REQUIRED COMPONENTS Multimedia)
-find_package(Qt6 REQUIRED COMPONENTS MultimediaWidgets)
+find_package(Qt6 COMPONENTS Widgets MultimediaWidgets Multimedia REQUIRED)
 
 # Find OpenCV
 find_package(OpenCV REQUIRED)
