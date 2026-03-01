@@ -15,6 +15,9 @@ MainWindow::MainWindow() :
 
     QMainWindow() {
 
+        // adds the logo next to the title
+        setWindowIcon(QIcon(":/images/logo.png"));
+
         centralWidget = new QWidget(this);
         player = new VideoPlayer(centralWidget);
         mainVerticalLayout = new QVBoxLayout(centralWidget);
