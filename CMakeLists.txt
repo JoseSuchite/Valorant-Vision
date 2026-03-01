@@ -26,6 +26,10 @@ target_link_libraries(Valorant-Vision
     ${OpenCV_LIBS}
 )
 
+# For adding logo to the app window
+qt_add_resources(APP_RESOURCES resources.qrc)
+target_sources(Valorant-Vision PRIVATE ${APP_RESOURCES})
+
 # Optional debug info
 message(STATUS "Qt6_DIR: ${Qt6_DIR}") 
 message(STATUS "OpenCV version: ${OpenCV_VERSION}")
