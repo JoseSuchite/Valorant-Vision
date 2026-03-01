@@ -10,22 +10,30 @@
 - OpenCV installed  
   - Example path:  
     `C:\opencv\build\bin`
+- Cmake Installed 
 
 ---
 
 ## Environment Variables
 
-### User Variable
-**Name:** `CMAKE_PREFIX_PATH`  
-**Value:**
-C:\Qt\6.10.2\msvc2022_64\bin
-
----
-
 ## PATH Additions (User Variables)
-Add the following paths:
+Press Windows Key and search `edit environment variables for your account`
+![Example of Env Menu search](images/env.jpg)
 
-`C:\Qt\6.10.2\msvc2022_64\bin`,
+Select `Environment Varaibles` option below Startup and Recovery.
+
+
+Add the following paths to the highlighted option in the image:
+![Example of Env Variablle](images/picture.jpg)
+
+AFTER DOUBLE CLICKING ON Path!!  
+`C:\Qt\6.10.2\msvc2022_64\bin`  
 `C:\opencv\build\bin`
 
-
+## To make the Build
+After changing to the directory the code run these commands in the following order:  
+`cmake -S . -B build -G "Visual Studio 17 2022" -A x64 -T v142` - Forces Cmake to use v142 toolset  
+`cmake --build build --config Release` - makes a release build in the following directory: build/Release/Valorant-Vision.exe  
+  
+If you need to rebuild or make the build again run the following code before to delete the previous build:  
+`rmdir /s /q build`
