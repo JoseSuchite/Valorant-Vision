@@ -7,7 +7,7 @@
 #include <QFileDialog>
 #include <QObject>
 
-
+#include "../headers/logbar.h"
 #include "../headers/mainwindow.h"
 #include "../headers/videoplayer.h"
 
@@ -19,19 +19,24 @@ MainWindow::MainWindow() :
         setWindowIcon(QIcon(":/images/logo.png"));
 
         centralWidget = new QWidget(this);
+        logBar = new LogBar(this);
+        addDockWidget(Qt::RightDockWidgetArea, logBar);
         player = new VideoPlayer(centralWidget);
         mainVerticalLayout = new QVBoxLayout(centralWidget);
-        chooseFileButton = new QPushButton("CLICK MEEEE", centralWidget);
+        chooseFileButton = new QPushButton("Select Video", centralWidget);
         pauseButton = new QPushButton("Pause/Play", centralWidget);
+        logButton = new QPushButton("Reset Log Bar", centralWidget);
 
         QObject::connect(chooseFileButton, &QPushButton::clicked, this, &MainWindow::openAndPlayVideoOnClick);
         QObject::connect(pauseButton, &QPushButton::clicked, this, &MainWindow::pauseOrPlayVideo);
+        QObject::connect(logButton, &QPushButton::clicked, this, &MainWindow::resetBar);
 
         this->setCentralWidget(centralWidget);
 
         mainVerticalLayout->addWidget(player);
         mainVerticalLayout->addWidget(chooseFileButton);
         mainVerticalLayout->addWidget(pauseButton);
+        mainVerticalLayout->addWidget(logButton);
 
 
         player->hide();
@@ -45,8 +50,13 @@ void MainWindow::openAndPlayVideoOnClick() {
 
     player->show();
     player->displayVideo(source);
+    logBar->addLog("Video Loaded.");
 }
 
 void MainWindow::pauseOrPlayVideo() {
     player->pauseOrPlayVideo();
+}
+
+void MainWindow::resetBar() {
+    logBar->resetBar();
 }
