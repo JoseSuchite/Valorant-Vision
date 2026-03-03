@@ -23,6 +23,7 @@ add_executable(Valorant-Vision
     "cpp/LogBar.cpp"
     "headers/logbar.h")
 
+
 # Link Qt + OpenCV
 target_link_libraries(Valorant-Vision
     Qt6::Widgets
