@@ -18,25 +18,34 @@ class ImageGenerator:
     def __init__(self,
                  agent_icon_path: str,
                  minimap_path: str,
+                 misc_icon_path: str,
                  agent_resize_factor=(64,64)):
         self.agent_icon_path = agent_icon_path
         self.map_layout_path = minimap_path
         self.agent_resize_factor = agent_resize_factor
+        self.misc_icon_path = misc_icon_path
 
         self.agent_icons = []
         self.map_layouts = []
+        self.misc_icons = []
 
-        def load_results(folder_path, array):
+        def load_results(folder_path, array, resize_factor=None):
             for path in os.listdir(folder_path):
                 path = os.path.join(folder_path, path)
                 result = self.load_image(path)
                 if result:
                     img, label = result
                     img = img.transpose(1, 2, 0) # Puts everything in HWC format for cv2
+                    if resize_factor is not None:
+                        img = cv2.resize(img, resize_factor)
                     array.append((img, label))
 
-        load_results(self.agent_icon_path, self.agent_icons)
+        load_results(self.agent_icon_path, self.agent_icons, resize_factor=self.agent_resize_factor)
         load_results(self.map_layout_path, self.map_layouts)
+        load_results(self.misc_icon_path, self.misc_icons)
+
+        self._class_ids = {name: i for i, (_, name) in enumerate(self.agent_icons)}
+
 
     # Takes in an image path and returns the image (as a numpy array) and the filename (without extension)
     def load_image(self, image_path):
@@ -68,8 +77,10 @@ class ImageGenerator:
         position_data = []
 
         for _ in range(num_agents_to_draw):
+
             agent_icon, agent_name = random.choice(self.agent_icons)
             agent_icon = self.square_to_circle_with_border(image=agent_icon)
+            agent_icon = cv2.GaussianBlur(agent_icon, (7, 7), 5)
 
             # Get dimensions of the minimap and agent icon
             minimap_height, minimap_width, _ = minimap.shape
@@ -79,53 +90,216 @@ class ImageGenerator:
             if icon_width > minimap_width or icon_height > minimap_height:
                 continue
 
-            # Randomly select a position for the agent on the minimap
-            x = random.randint(0, minimap_width - icon_width)
-            y = random.randint(0, minimap_height - icon_height)
+            def sample_valid_position(mask, icon_h, icon_w):
+                valid_points = np.argwhere(mask[:, :, 3] > 0)
+
+                if len(valid_points) == 0:
+                    return None
+
+                y, x = valid_points[random.randint(0, len(valid_points)-1)]
+
+                # keep icon inside map
+                x = np.clip(x, 0, mask.shape[1] - icon_w)
+                y = np.clip(y, 0, mask.shape[0] - icon_h)
+
+                return x, y
+
+            x, y = sample_valid_position(minimap, icon_height, icon_width)
 
             # Overlay the agent icon onto the minimap at the selected position
-            result = self.overlay_transparent(minimap, agent_icon, x, y, self.agent_resize_factor)
+            scaling_factor = random.uniform(0.8, 1.2)
+            resize_factor = (int(self.agent_resize_factor[0] * scaling_factor), int(self.agent_resize_factor[1] * scaling_factor))
+            result = self.overlay_transparent(minimap, agent_icon, x, y, resize_factor)
             if result is not None:
                 minimap = result
-                height, width = self.agent_resize_factor
+
+                # resize icon exactly the same way it was drawn (please change this later PLEASE)
+                scaled_icon = cv2.resize(agent_icon, resize_factor)
+
+
+                alpha = scaled_icon[..., 3]
+                ys, xs = np.where(alpha > 0)
+
+                xmin, xmax = xs.min(), xs.max()
+                ymin, ymax = ys.min(), ys.max()
+
+                width = xmax - xmin
+                height = ymax - ymin
+                
                 position_data.append({
                     "name": agent_name,
-                    "coordinates": (x, y),
+                    "coordinates": (x + xmin, y + ymin),
                     "height": height,
                     "width": width
                 })
 
         return minimap, position_data
 
+    def draw_misc(self, minimap, num_misc_to_draw):
 
-    # Takes in a numpy array (image) and returns a circular version as a numpy array
-    def square_to_circle_with_border(self, image, border_color=None):
+        for _ in range(num_misc_to_draw):
 
-        image = image.transpose(2, 1, 0)
+            icon, _ = random.choice(self.misc_icons)
+            icon = self.rotate_image_randomly(icon)
 
-        _, height, width = image.shape
-        mask = self.create_circular_mask(height, width)
+            # Get dimensions of the minimap and agent icon
+            minimap_height, minimap_width, _ = minimap.shape
+            icon_height, icon_width, _ = icon.shape
 
-        # Apply mask to alpha channel
-        masked_img = image.copy()
-        masked_img[3][~mask] = 0
+            # Check if agent icon fits within minimap (should always be the case)
+            if icon_width > minimap_width or icon_height > minimap_height:
+                continue
 
-        masked_img = masked_img.transpose(2, 1, 0)
+            def sample_valid_position(mask, icon_h, icon_w):
+                valid_points = np.argwhere(mask[:, :, 3] > 0)
 
-        return masked_img
+                if len(valid_points) == 0:
+                    return None
 
-    def create_circular_mask(self, h, w, center=None, radius=None):
+                y, x = valid_points[random.randint(0, len(valid_points)-1)]
 
-        if center is None: # use the middle of the image
-            center = (int(w/2), int(h/2))
-        if radius is None: # use the smallest distance between the center and image walls
-            radius = min(center[0], center[1], w-center[0], h-center[1])
+                # keep icon inside map
+                x = np.clip(x, 0, mask.shape[1] - icon_w)
+                y = np.clip(y, 0, mask.shape[0] - icon_h)
+
+                return x, y
+
+            x, y = sample_valid_position(minimap, icon_height, icon_width)
+
+            # Overlay the agent icon onto the minimap at the selected position
+            scaling_factor = random.uniform(0.8, 1.2)
+            resize_factor = (icon_width * scaling_factor * 2, icon_height * scaling_factor * 2)
+
+            result = self.overlay_transparent(minimap, icon, x, y, overlay_size=(32, 32))
+
+        return minimap
+
+    def rotate_image_randomly(self, image):
+        height, width = image.shape[:2]
+        center = (width // 2, height // 2)
+        # Generate random angle, range can be adjusted for augmentation
+        angle = random.uniform(0, 360) 
+        
+        # Get the 2D rotation matrix
+        rotation_matrix = cv2.getRotationMatrix2D(center, angle, 1.0)
+
+        # Perform the affine warp to apply the rotation
+        return cv2.warpAffine(image, rotation_matrix, (width, height))
+
+    def create_circular_mask(h, w):
+
+        center = (int(w/2), int(h/2))
+        
+        radius = min(center[0], center[1], w-center[0], h-center[1])
 
         Y, X = np.ogrid[:h, :w]
         dist_from_center = np.sqrt((X - center[0])**2 + (Y-center[1])**2)
 
         mask = dist_from_center <= radius
-        return mask
+
+        return mask, center, radius
+
+    # Takes in a numpy array (image) and returns a circular version as a numpy array
+    def square_to_circle_with_border(self, image: np.ndarray, border_color=None,
+                                      direction_angle: float = None) -> np.ndarray:  # noqa: keep sig
+        """
+        Renders a Valorant-style agent indicator: a circular icon with a coloured
+        teardrop border whose point indicates facing direction.
+
+        The teardrop is a single continuous hollow shape — a wide circle base that
+        smoothly narrows to a point — matching the in-game minimap indicator.
+
+        Expects and returns HWC RGBA float32 in [0, 1].
+
+        Args:
+            image:           HWC RGBA float32 source icon.
+            border_color:    RGBA float32 tuple. Defaults to red (enemy) or teal (ally).
+            direction_angle: Tip direction in degrees (0 = up, clockwise).
+                             If None, a random direction is chosen.
+        """
+        if border_color is None:
+            border_color = (183/255, 32/255, 48/255, 1.0) if random.random() < 0.5 \
+                           else (125/255, 211/255, 188/255, 1.0)
+
+        if direction_angle is None:
+            direction_angle = random.uniform(0, 360)
+
+        # --- 1. Expand canvas to fit the tip without clipping ---
+        src = image.copy()
+
+        # fill in transparent pixels with border color
+        transparent_pixels = src[:, :, 3] == 0
+        src[transparent_pixels] = border_color
+
+        h, w = src.shape[:2]
+        outer_r   = min(h, w) // 2
+        border_px = max(3, outer_r // 8)
+        arrow_len = int(outer_r * 0.55)   # tip protrusion beyond circle edge
+
+        pad   = arrow_len + border_px + 4
+        new_h = h + 2 * pad
+        new_w = w + 2 * pad
+
+        canvas = np.zeros((new_h, new_w, 4), dtype=np.float32)
+        canvas[pad:pad+h, pad:pad+w] = src
+        src_padded = canvas.copy()  # icon on expanded canvas, used to restore centre
+
+        cx = pad + w // 2
+        cy = pad + h // 2
+
+
+        # --- 2. Build the teardrop mask ---
+        # The outer teardrop = union of:
+        #   (a) the main circle  (radius outer_r)
+        #   (b) a linearly tapered wedge that narrows from outer_r wide at the
+        #       circle centre to 0 at the tip  (distance tip_reach from centre)
+        # The inner hollow = same shape shrunk inward by border_px.
+        # Ring = outer & ~inner.  Then zero alpha everywhere outside ring.
+        math_angle = np.radians(-(direction_angle - 90))
+        dx = np.cos(math_angle)
+        dy = -np.sin(math_angle)
+
+        tip_reach = outer_r + arrow_len   # distance from centre to tip
+
+        Y, X = np.ogrid[:new_h, :new_w]
+        Xf = X.astype(np.float32)
+        Yf = Y.astype(np.float32)
+
+        proj     = (Xf - cx) * dx + (Yf - cy) * dy          # along arrow axis
+        perp_abs = np.abs((Xf - cx) * (-dy) + (Yf - cy) * dx)  # ⊥ distance
+        dist_c   = np.sqrt((Xf - cx)**2 + (Yf - cy)**2)
+
+        # Outer boundary
+        taper_hw_outer = outer_r * (1.0 - proj / tip_reach)
+        in_outer = (dist_c <= outer_r) | (
+            (proj >= 0) & (proj <= tip_reach) & (perp_abs <= np.maximum(taper_hw_outer, 0))
+        )
+
+        # Inner boundary (border_px smaller in every direction)
+        inner_r      = outer_r   - border_px
+        inner_reach  = tip_reach - border_px
+        taper_hw_inner = inner_r * (1.0 - proj / inner_reach)
+        in_inner = (dist_c <= inner_r) | (
+            (proj >= 0) & (proj <= inner_reach) & (perp_abs <= np.maximum(taper_hw_inner, 0))
+        )
+
+        ring = in_outer & ~in_inner
+
+        # Fill entire teardrop solid, then cut a circular hole for the icon
+        canvas[~in_outer, 3] = 0.0
+        canvas[in_outer] = border_color
+        # Restore the icon pixels inside the inner circle (the hollow centre)
+        inner_circle = dist_c <= inner_r
+        canvas[inner_circle] = src_padded[inner_circle]
+
+        # --- 3. Crop back symmetrically ---
+        crop_pad = arrow_len + border_px + 2
+        out = canvas[pad - crop_pad : pad + h + crop_pad,
+                     pad - crop_pad : pad + w + crop_pad]
+
+        return np.ascontiguousarray(out)
+
+   
 
     # Takes in a background and overlays an image on top of it (the overlay must be RGBA). X and Y are the position the overlay should appear on the background
     def overlay_transparent(self, background, overlay, x, y, overlay_size=None):
@@ -192,7 +366,7 @@ class ImageGenerator:
             bottom_right = (x + width, y + height)
 
             # This shouldn't be needed, but y'know.
-            if top_left[0] < 0 or top_left[1] < 0 or bottom_right[0] > background.shape[0] or bottom_right[1] > background.shape[1]:
+            if top_left[0] < 0 or top_left[1] < 0 or bottom_right[0] > background.shape[1] or bottom_right[1] > background.shape[0]:
                 continue
 
             purple = (128, 0, 128)
@@ -202,10 +376,7 @@ class ImageGenerator:
 
     # Returns a dict mapping class names to class ids
     def get_class_ids(self):
-        class_ids = {}
-        for i, (icon, name) in enumerate(self.agent_icons):
-            class_ids[name] = i
-        return class_ids
+        return self._class_ids
 
     def output_image_and_label(self, image, positions, file_name, is_train=True):
 
@@ -264,7 +435,8 @@ class ImageGenerator:
 
             minimap = self.generate_map()
 
-            minimap, positions = self.draw_agents(minimap, num_agents_to_draw=10)
+            minimap = self.draw_misc(minimap, random.randint(2, 8))
+            minimap, positions = self.draw_agents(minimap, num_agents_to_draw=random.randint(1, 10))
 
             # Retry if no valid positions were generated
             if minimap is None or len(positions) == 0:
