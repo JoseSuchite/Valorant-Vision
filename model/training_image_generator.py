@@ -19,10 +19,11 @@ class ImageGenerator:
                  agent_icon_path: str,
                  minimap_path: str,
                  misc_icon_path: str,
-                 agent_resize_factor=(64,64)):
+                 map_resize_factor=(384,384)):
         self.agent_icon_path = agent_icon_path
         self.map_layout_path = minimap_path
-        self.agent_resize_factor = agent_resize_factor
+        self.map_resize_factor = map_resize_factor
+        self.agent_resize_factor = (int(map_resize_factor[0] * 0.1), int(map_resize_factor[1] * 0.1)) 
         self.misc_icon_path = misc_icon_path
 
         self.agent_icons = []
@@ -41,7 +42,7 @@ class ImageGenerator:
                     array.append((img, label))
 
         load_results(self.agent_icon_path, self.agent_icons, resize_factor=self.agent_resize_factor)
-        load_results(self.map_layout_path, self.map_layouts)
+        load_results(self.map_layout_path, self.map_layouts, resize_factor=self.map_resize_factor)
         load_results(self.misc_icon_path, self.misc_icons)
 
         self._class_ids = {name: i for i, (_, name) in enumerate(self.agent_icons)}
@@ -80,7 +81,7 @@ class ImageGenerator:
 
             agent_icon, agent_name = random.choice(self.agent_icons)
             agent_icon = self.square_to_circle_with_border(image=agent_icon)
-            agent_icon = cv2.GaussianBlur(agent_icon, (7, 7), 5)
+            agent_icon = cv2.GaussianBlur(agent_icon, (3, 3), 3)
 
             # Get dimensions of the minimap and agent icon
             minimap_height, minimap_width, _ = minimap.shape
@@ -107,15 +108,15 @@ class ImageGenerator:
             x, y = sample_valid_position(minimap, icon_height, icon_width)
 
             # Overlay the agent icon onto the minimap at the selected position
-            scaling_factor = random.uniform(0.8, 1.2)
+            scaling_factor = random.uniform(0.9, 1.1)
             resize_factor = (int(self.agent_resize_factor[0] * scaling_factor), int(self.agent_resize_factor[1] * scaling_factor))
+
             result = self.overlay_transparent(minimap, agent_icon, x, y, resize_factor)
             if result is not None:
                 minimap = result
 
                 # resize icon exactly the same way it was drawn (please change this later PLEASE)
                 scaled_icon = cv2.resize(agent_icon, resize_factor)
-
 
                 alpha = scaled_icon[..., 3]
                 ys, xs = np.where(alpha > 0)
@@ -166,11 +167,11 @@ class ImageGenerator:
 
             x, y = sample_valid_position(minimap, icon_height, icon_width)
 
-            # Overlay the agent icon onto the minimap at the selected position
-            scaling_factor = random.uniform(0.8, 1.2)
-            resize_factor = (icon_width * scaling_factor * 2, icon_height * scaling_factor * 2)
+            # Overlay the icon onto the minimap at the selected position
+            scaling_factor = random.uniform(0.9, 1.1)
+            resize_factor = (int(16 * scaling_factor), int(16 * scaling_factor))
 
-            result = self.overlay_transparent(minimap, icon, x, y, overlay_size=(32, 32))
+            result = self.overlay_transparent(minimap, icon, x, y, overlay_size=resize_factor)
 
         return minimap
 
@@ -220,6 +221,10 @@ class ImageGenerator:
         if border_color is None:
             border_color = (183/255, 32/255, 48/255, 1.0) if random.random() < 0.5 \
                            else (125/255, 211/255, 188/255, 1.0)
+
+        # Apply a little randomness to the border color
+        border_color = (random.uniform(-0.02, 0.02) + border_color[0], random.uniform(-0.02, 0.02) + border_color[1], random.uniform(-0.02, 0.02) + border_color[2], 0)
+        border_color = np.clip(border_color, 0, 1)
 
         if direction_angle is None:
             direction_angle = random.uniform(0, 360)
@@ -426,6 +431,14 @@ class ImageGenerator:
         if not success:
             raise IOError(f"Failed to write image to {image_path}")
 
+    def apply_jpeg_compression(self, image, quality_range=(20, 90)):
+        quality = random.randint(*quality_range)
+
+        encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), quality]
+        _, encimg = cv2.imencode(".jpg", (image * 255).astype(np.uint8), encode_param)
+
+        decimg = cv2.imdecode(encimg, cv2.IMREAD_UNCHANGED)
+        return decimg.astype(np.float32) / 255.0
 
 
     # Takes in the name of the files you want to create and outputs an image and txt file with that name
@@ -435,9 +448,9 @@ class ImageGenerator:
 
             minimap = self.generate_map()
 
-            minimap = self.draw_misc(minimap, random.randint(2, 8))
-            minimap, positions = self.draw_agents(minimap, num_agents_to_draw=random.randint(1, 10))
-
+            minimap = self.draw_misc(minimap, random.randint(10, 16))
+            minimap, positions = self.draw_agents(minimap, 10)
+            minimap = self.apply_jpeg_compression(minimap)
             # Retry if no valid positions were generated
             if minimap is None or len(positions) == 0:
                 continue
