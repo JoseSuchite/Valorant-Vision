@@ -23,7 +23,7 @@ class ImageGenerator:
         self.agent_icon_path = agent_icon_path
         self.map_layout_path = minimap_path
         self.map_resize_factor = map_resize_factor
-        self.agent_resize_factor = (int(map_resize_factor[0] * 0.1), int(map_resize_factor[1] * 0.1)) 
+        self.agent_resize_factor = (int(map_resize_factor[0] * 0.09), int(map_resize_factor[1] * 0.09)) 
         self.misc_icon_path = misc_icon_path
 
         self.agent_icons = []
@@ -223,7 +223,11 @@ class ImageGenerator:
                            else (125/255, 211/255, 188/255, 1.0)
 
         # Apply a little randomness to the border color
-        border_color = (random.uniform(-0.02, 0.02) + border_color[0], random.uniform(-0.02, 0.02) + border_color[1], random.uniform(-0.02, 0.02) + border_color[2], 0)
+        COLOR_DEVIATION_FACTOR = 0.5 # [REMOVE] later, this is just to have it focus on detecting the portrait rather than relying on the border color
+        border_color = (random.uniform(-COLOR_DEVIATION_FACTOR, COLOR_DEVIATION_FACTOR) + border_color[0], 
+                        random.uniform(-COLOR_DEVIATION_FACTOR, COLOR_DEVIATION_FACTOR) + border_color[1], 
+                        random.uniform(-COLOR_DEVIATION_FACTOR, COLOR_DEVIATION_FACTOR) + border_color[2], 1)
+
         border_color = np.clip(border_color, 0, 1)
 
         if direction_angle is None:
@@ -451,6 +455,7 @@ class ImageGenerator:
             minimap = self.draw_misc(minimap, random.randint(10, 16))
             minimap, positions = self.draw_agents(minimap, 10)
             minimap = self.apply_jpeg_compression(minimap)
+
             # Retry if no valid positions were generated
             if minimap is None or len(positions) == 0:
                 continue
