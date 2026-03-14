@@ -10,6 +10,7 @@
 #include "../headers/logbar.h"
 #include "../headers/mainwindow.h"
 #include "../headers/videoplayer.h"
+#include "../headers/minimap.h"
 
 MainWindow::MainWindow() :
 
@@ -19,27 +20,50 @@ MainWindow::MainWindow() :
         setWindowIcon(QIcon(":/images/logo.png"));
 
         centralWidget = new QWidget(this);
+        topRow = new QHBoxLayout();
+        mainVerticalLayout = new QVBoxLayout(centralWidget);
+        bottomRow = new QHBoxLayout();
+
         logBar = new LogBar(this);
         addDockWidget(Qt::RightDockWidgetArea, logBar);
+        minimap_wid = new Minimap(this);
+        addDockWidget(Qt::RightDockWidgetArea, minimap_wid);
+        minimap_wid->loadImage("map_layouts/Ascent_layout.png");
         player = new VideoPlayer(centralWidget);
-        mainVerticalLayout = new QVBoxLayout(centralWidget);
         chooseFileButton = new QPushButton("Select Video", centralWidget);
         pauseButton = new QPushButton("Pause/Play", centralWidget);
         logButton = new QPushButton("Reset Log Bar", centralWidget);
 
-        QObject::connect(chooseFileButton, &QPushButton::clicked, this, &MainWindow::openAndPlayVideoOnClick);
-        QObject::connect(pauseButton, &QPushButton::clicked, this, &MainWindow::pauseOrPlayVideo);
-        QObject::connect(logButton, &QPushButton::clicked, this, &MainWindow::resetBar);
+        // removed QObject as it was not needed, as they are calling their own functions.
+        connect(chooseFileButton, &QPushButton::clicked, this, &MainWindow::openAndPlayVideoOnClick);
+        connect(pauseButton, &QPushButton::clicked, this, &MainWindow::pauseOrPlayVideo);
+        connect(logButton, &QPushButton::clicked, this, &MainWindow::resetBar);
 
         this->setCentralWidget(centralWidget);
 
+        // add the buttons to their respective layout like top or bottom
+        topRow->addWidget(chooseFileButton);
+        topRow->addWidget(logButton);
+        bottomRow->addWidget(pauseButton);
+
+        // format the layout of the buttons and player
+        mainVerticalLayout->addLayout(topRow);
         mainVerticalLayout->addWidget(player);
-        mainVerticalLayout->addWidget(chooseFileButton);
-        mainVerticalLayout->addWidget(pauseButton);
-        mainVerticalLayout->addWidget(logButton);
+        mainVerticalLayout->addLayout(bottomRow);
 
+        // resizes the select video button
+        chooseFileButton->setFixedSize(120, 40);
+        chooseFileButton->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
 
-        player->hide();
+        // resizes the reset log button
+        logButton->setFixedSize(120, 40);
+        logButton->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+
+        //resizes the pause/play button
+        pauseButton->setFixedSize(120, 40);
+        pauseButton->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+
+        //player->hide();
         this->show();
 }
 
