@@ -21,8 +21,10 @@ add_executable(Valorant-Vision
     "headers/mainwindow.h"
     "cpp/mainwindow.cpp"
     "cpp/LogBar.cpp"
-    "headers/logbar.h")
-
+    "headers/logbar.h"
+    "cpp/minimap.cpp"
+    "headers/minimap.h"
+)
 
 # Link Qt + OpenCV
 target_link_libraries(Valorant-Vision
@@ -31,6 +33,15 @@ target_link_libraries(Valorant-Vision
     Qt6::MultimediaWidgets
     ${OpenCV_LIBS}
 )
+
+# adds the minimap folder to the .exe directory
+add_custom_command(
+    TARGET ${PROJECT_NAME} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${CMAKE_SOURCE_DIR}/map_layouts"
+            "$<TARGET_FILE_DIR:${PROJECT_NAME}>/map_layouts"
+)
+
 
 # For adding logo to the app window
 qt_add_resources(APP_RESOURCES resources.qrc)
