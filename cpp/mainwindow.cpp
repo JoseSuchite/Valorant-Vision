@@ -6,6 +6,7 @@
 #include <QPushButton>
 #include <QFileDialog>
 #include <QObject>
+#include <QFileInfo>
 
 #include "../headers/logbar.h"
 #include "../headers/mainwindow.h"
@@ -46,6 +47,13 @@ MainWindow::MainWindow() :
 void MainWindow::openAndPlayVideoOnClick() {
 
     QString QSource = QFileDialog::getOpenFileName(this, tr("Open Video"), "C:", tr("*.mp4 *.mp3"));
+
+    QFileInfo fileInfo(QSource);
+    if (!fileInfo.exists() || !fileInfo.isFile()) {
+        logBar->addLog("Invalid file selected.");
+        return;
+    }
+
     std::string source = QSource.toStdString();
 
     player->show();
