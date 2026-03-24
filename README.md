@@ -1,17 +1,5 @@
 # Valorant-Vision
 
-## Requirements
-
-### Windows Build Requirements
-- Visual Studio with **MSVC v142 (2019 build tools)** installed  
-- Qt built with **MSVC 2022**  
-  - Example installation path:  
-    `C:\Qt\6.10.2\msvc2022_64`
-- OpenCV installed  
-  - Example path:  
-    `C:\opencv\build\bin`
-- Cmake Installed
-
 # FOR LINUX (Debian/Ubuntu)
 
 ## Requirements
@@ -43,6 +31,18 @@
 ---
 # FOR WINDOWS
 
+## Requirements
+
+### Windows Build Requirements
+- Visual Studio with **MSVC v142 (2019 build tools)** installed  
+- Qt built with **MSVC 2022**  
+  - Example installation path:  
+    `C:\Qt\6.10.2\msvc2022_64`
+- OpenCV installed  
+  - Example path:  
+    `C:\opencv\build\bin`
+- Cmake Installed
+
 ## Environment Variables
 
 ## PATH Additions (User Variables)
@@ -67,5 +67,8 @@ After changing to the directory the code run these commands in the following ord
 If you need to rebuild or make the build again run the following code before to delete the previous build:  
 `rmdir /s /q build`
 
+# For MacOS
+
+## Requirements
 
 
