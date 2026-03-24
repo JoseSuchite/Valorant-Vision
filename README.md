@@ -13,6 +13,7 @@
 - Cmake Installed 
 
 ---
+### FOR WINDOWS
 
 ## Environment Variables
 
@@ -37,3 +38,5 @@ After changing to the directory the code run these commands in the following ord
   
 If you need to rebuild or make the build again run the following code before to delete the previous build:  
 `rmdir /s /q build`
+
+### FOR LINUX
