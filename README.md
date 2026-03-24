@@ -10,10 +10,38 @@
 - OpenCV installed  
   - Example path:  
     `C:\opencv\build\bin`
-- Cmake Installed 
+- Cmake Installed
+
+# FOR LINUX (Debian/Ubuntu)
+
+## Requirements
+- An editor such as VSCodium
+- CMake
+
+  `https://cmake.org/download/`
+- OpenCV
+
+  `sudo apt update`
+
+  `sudo apt install build-essential cmake libopencv-dev`
+- QT
+
+  `sudo apt install qt6-base-dev qt6-declarative-dev qt6-multimedia-dev libqt6multimediawidgets6`
+
+## Running Software
+
+- Make sure you are in the Valorant Vision Folder Directory
+  
+1. `cmake ..`
+
+2. `make -j$(nproc)`
+
+3. `./Valorant-Vision`
+  
+  
 
 ---
-### FOR WINDOWS
+# FOR WINDOWS
 
 ## Environment Variables
 
@@ -39,4 +67,5 @@ After changing to the directory the code run these commands in the following ord
 If you need to rebuild or make the build again run the following code before to delete the previous build:  
 `rmdir /s /q build`
 
-### FOR LINUX
+
+
