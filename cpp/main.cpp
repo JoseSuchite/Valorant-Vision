@@ -17,6 +17,12 @@ int main(int argc, char* argv[])
 
     QApplication app(argc, argv);
 
+    QFile stylesheet(":/style/style.qss");
+    if (stylesheet.open(QIODevice::ReadOnly | QIODevice::Text)){
+        qApp->setStyleSheet(stylesheet.readAll());
+        stylesheet.close();
+    }
+
     MainWindow mainWindow;
     mainWindow.show();
     //mainWindow.setWindowTitle("Valorant-Vision");
