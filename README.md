@@ -16,7 +16,7 @@
 
 ## Requirements
 - An editor such as VSCodium
-- CMake
+- CMake (Source Distribution)
 
   `https://cmake.org/download/`
 - OpenCV
