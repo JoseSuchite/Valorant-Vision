@@ -35,7 +35,6 @@ MainWindow::MainWindow() :
         picLabel->setPixmap(pixmap);
 
         pauseButton = new QPushButton("Pause/Play", centralWidget);
-        pauseButton->setStyleSheet(QString("background-color: red;"));
 
         volumeSlider = new QSlider(Qt::Horizontal, this);
         volumeSlider->setRange(0, 100);
