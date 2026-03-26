@@ -4,10 +4,12 @@ import torchvision
 import cv2
 import random
 import numpy as np
+import math
 
 """
 agent_icon_path: relative path to the folder with agent icons
 minimap_path: relative path to the folder with map layouts
+misc_path: relative path to the folder with miscellaneous icons
 agent_resize_factor: the size that the agent icons should be resized to when drawn on the minimap (tuple in form: height, width)
 
 Note: images are kept internally in height, width, channels format for ease of use with cv2
@@ -30,10 +32,27 @@ class ImageGenerator:
         self.map_layouts = []
         self.misc_icons = []
 
+        # Takes in an image path and returns the image (as a numpy array) and the filename (without extension)
+        def load_image(image_path):
+
+            if os.path.isfile(image_path):
+
+                full_image_path = os.path.basename(image_path)
+                split = os.path.splitext(full_image_path)
+                basefile = split[0]
+                extension = split[1]
+
+                if extension.lower() == ".png":
+                    image = Image.open(image_path)
+                    image = torchvision.transforms.ToTensor()(image).numpy()
+                    return (image, basefile)
+                else:
+                    raise ValueError(f"Unsupported image format: {extension}")
+
         def load_results(folder_path, array, resize_factor=None):
             for path in os.listdir(folder_path):
                 path = os.path.join(folder_path, path)
-                result = self.load_image(path)
+                result = load_image(path)
                 if result:
                     img, label = result
                     img = img.transpose(1, 2, 0) # Puts everything in HWC format for cv2
@@ -45,25 +64,7 @@ class ImageGenerator:
         load_results(self.map_layout_path, self.map_layouts, resize_factor=self.map_resize_factor)
         load_results(self.misc_icon_path, self.misc_icons)
 
-        self._class_ids = {name: i for i, (_, name) in enumerate(self.agent_icons)}
-
-
-    # Takes in an image path and returns the image (as a numpy array) and the filename (without extension)
-    def load_image(self, image_path):
-
-        if os.path.isfile(image_path):
-
-            full_image_path = os.path.basename(image_path)
-            split = os.path.splitext(full_image_path)
-            basefile = split[0]
-            extension = split[1]
-
-            if extension.lower() == ".png":
-                image = Image.open(image_path)
-                image = torchvision.transforms.ToTensor()(image).numpy()
-                return (image, basefile)
-            else:
-                raise ValueError(f"Unsupported image format: {extension}")
+        self.class_ids = {name: i for i, (_, name) in enumerate(self.agent_icons)}
 
     # Pick a random minimap and return it as a numpy array
     def generate_map(self):
@@ -80,8 +81,9 @@ class ImageGenerator:
         for _ in range(num_agents_to_draw):
 
             agent_icon, agent_name = random.choice(self.agent_icons)
-            agent_icon = self.square_to_circle_with_border(image=agent_icon)
-            agent_icon = cv2.GaussianBlur(agent_icon, (3, 3), 3)
+            agent_icon, inner_r, crop_pad = self.square_to_circle_with_border(image=agent_icon)
+            agent_icon = self.rotate_image_randomly(agent_icon, angle_range=(-20, 20))
+            agent_icon = self.skew_image(agent_icon, skew_angle_deg_x=random.randint(-10, 10), skew_angle_deg_y=random.randint(-10, 10))
 
             # Get dimensions of the minimap and agent icon
             minimap_height, minimap_width, _ = minimap.shape
@@ -118,24 +120,27 @@ class ImageGenerator:
                 # resize icon exactly the same way it was drawn (please change this later PLEASE)
                 scaled_icon = cv2.resize(agent_icon, resize_factor)
 
-                alpha = scaled_icon[..., 3]
-                ys, xs = np.where(alpha > 0)
+                # Scale inner_r and crop_pad to match the resized icon
+                scale = resize_factor[0] / agent_icon.shape[0]
+                scaled_inner_r = int(inner_r * scale)
+                scaled_crop_pad = int(crop_pad * scale)
 
-                xmin, xmax = xs.min(), xs.max()
-                ymin, ymax = ys.min(), ys.max()
+                # Center of the icon in minimap coordinates
+                icon_cx = x + scaled_crop_pad + (resize_factor[1] // 2 - scaled_crop_pad)
+                icon_cy = y + scaled_crop_pad + (resize_factor[0] // 2 - scaled_crop_pad)
 
-                width = xmax - xmin
-                height = ymax - ymin
-                
+              
                 position_data.append({
                     "name": agent_name,
-                    "coordinates": (x + xmin, y + ymin),
-                    "height": height,
-                    "width": width
+                    #"coordinates": (x + xmin, y + ymin),
+                    "coordinates": (icon_cx - scaled_inner_r, icon_cy - scaled_inner_r),
+                    "height": scaled_inner_r * 2,
+                    "width": scaled_inner_r * 2
                 })
 
         return minimap, position_data
 
+    # Draws miscellaneous icons on the map that just need to be drawn on (we don't need to handle them specially)
     def draw_misc(self, minimap, num_misc_to_draw):
 
         for _ in range(num_misc_to_draw):
@@ -174,18 +179,6 @@ class ImageGenerator:
             result = self.overlay_transparent(minimap, icon, x, y, overlay_size=resize_factor)
 
         return minimap
-
-    def rotate_image_randomly(self, image):
-        height, width = image.shape[:2]
-        center = (width // 2, height // 2)
-        # Generate random angle, range can be adjusted for augmentation
-        angle = random.uniform(0, 360) 
-        
-        # Get the 2D rotation matrix
-        rotation_matrix = cv2.getRotationMatrix2D(center, angle, 1.0)
-
-        # Perform the affine warp to apply the rotation
-        return cv2.warpAffine(image, rotation_matrix, (width, height))
 
     def create_circular_mask(h, w):
 
@@ -306,9 +299,7 @@ class ImageGenerator:
         out = canvas[pad - crop_pad : pad + h + crop_pad,
                      pad - crop_pad : pad + w + crop_pad]
 
-        return np.ascontiguousarray(out)
-
-   
+        return np.ascontiguousarray(out), inner_r, crop_pad
 
     # Takes in a background and overlays an image on top of it (the overlay must be RGBA). X and Y are the position the overlay should appear on the background
     def overlay_transparent(self, background, overlay, x, y, overlay_size=None):
@@ -383,13 +374,9 @@ class ImageGenerator:
 
         return background
 
-    # Returns a dict mapping class names to class ids
-    def get_class_ids(self):
-        return self._class_ids
-
+    # Takes in an image and a list of positions (as well as the file name) and creates/saves the label file and the image file for it
     def output_image_and_label(self, image, positions, file_name, is_train=True):
 
-        class_ids = self.get_class_ids()
 
         current_dir = os.getcwd()
 
@@ -407,7 +394,7 @@ class ImageGenerator:
         label_path = os.path.join(current_dir, label_subdir, file_name + ".txt")
         with open(label_path, "w") as file:
             for position in positions:
-                class_id = class_ids[position["name"]]
+                class_id = self.class_ids[position["name"]]
 
                 box_width = position["width"]
                 box_height = position["height"]
@@ -417,11 +404,6 @@ class ImageGenerator:
 
                 width = box_width / image_width
                 height = box_height / image_height
-
-                # x_center = max(0, min(1, x_center))
-                # y_center = max(0, min(1, y_center))
-                # width = max(0.01, min(1, width))  # Ensure minimum width to avoid zero-sized boxes
-                # height = max(0.01, min(1, height))  # Ensure minimum height to avoid zero-sized boxes
 
                 # Only write valid bounding boxes
                 if width > 0 and height > 0 and 0 <= x_center <= 1 and 0 <= y_center <= 1:
@@ -435,7 +417,19 @@ class ImageGenerator:
         if not success:
             raise IOError(f"Failed to write image to {image_path}")
 
-    def apply_jpeg_compression(self, image, quality_range=(20, 90)):
+    def rotate_image_randomly(self, image, angle_range=(0, 360)):
+        height, width = image.shape[:2]
+        center = (width // 2, height // 2)
+        # Generate random angle, range can be adjusted for augmentation
+        angle = random.uniform(*angle_range)
+        
+        # Get the 2D rotation matrix
+        rotation_matrix = cv2.getRotationMatrix2D(center, angle, 1.0)
+
+        # Perform the affine warp to apply the rotation
+        return cv2.warpAffine(image, rotation_matrix, (width, height))
+   
+    def apply_jpeg_compression(self, image, quality_range=(20, 75)):
         quality = random.randint(*quality_range)
 
         encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), quality]
@@ -444,33 +438,91 @@ class ImageGenerator:
         decimg = cv2.imdecode(encimg, cv2.IMREAD_UNCHANGED)
         return decimg.astype(np.float32) / 255.0
 
+    def add_gaussian_noise(self, image, sigma_range=(0.002, 0.01)):
+        sigma = random.uniform(*sigma_range)
+        noise = np.random.normal(0, sigma, image.shape)
+        noisy = np.clip(image + noise, 0, 1)
+        return noisy
+
+    def scale_artifact(self, image, scale_range=(0.5, 0.9)):
+        scale = random.uniform(*scale_range)
+
+        h, w = image.shape[:2]
+        down = cv2.resize(image, (int(w*scale), int(h*scale)))
+        up = cv2.resize(down, (w, h), interpolation=cv2.INTER_LINEAR)
+
+        return up
+
+    def skew_image(self, image, skew_angle_deg_x=0, skew_angle_deg_y=0):
+        # Convert angles to radians and calculate tangent
+        # The value is in radians, so use math.tan()
+        sx = math.tan(math.radians(skew_angle_deg_x))
+        sy = math.tan(math.radians(skew_angle_deg_y))
+
+        h, w = image.shape[:2]
+
+        # Create the 2x3 shear matrix for cv2.warpAffine
+        # M = [[1, sx, 0],
+        #      [sy, 1, 0]]
+        # This matrix applies shear around the origin (top-left corner)
+        M = np.float32([[1, sx, 0],
+                        [sy, 1, 0]])
+
+        # Calculate new image dimensions to fit the whole skewed image
+        # This might need more complex logic for perfect fitting, but for a simple case:
+        new_w = int(w + abs(h * sx)) if sx != 0 else w
+        new_h = int(h + abs(w * sy)) if sy != 0 else h
+
+        # Apply the affine transformation
+        skewed_image = cv2.warpAffine(image, M, (new_w, new_h))
+
+        return skewed_image
+
+    def make_random_invisible(self, image, percent_invisible=0.8):
+        mask = np.random.rand(image.shape[0], image.shape[1]) < percent_invisible
+        image[mask] = 0
+        return image
+
 
     # Takes in the name of the files you want to create and outputs an image and txt file with that name
     def generate_data(self, data_name, is_train=True):
- 
-        while True:
 
-            minimap = self.generate_map()
+        minimap = self.generate_map()
 
-            minimap = self.draw_misc(minimap, random.randint(10, 16))
-            minimap, positions = self.draw_agents(minimap, 10)
-            minimap = self.apply_jpeg_compression(minimap)
+        minimap = self.draw_misc(minimap, num_misc_to_draw=random.randint(10, 16))
+        minimap, positions = self.draw_agents(minimap, num_agents_to_draw=random.randint(8, 20))
+        minimap = self.add_gaussian_noise(minimap, sigma_range=(0.0, 0.01))
+        minimap = self.scale_artifact(minimap, scale_range=(0.2, 1.0))
+        minimap = self.apply_jpeg_compression(minimap, quality_range=(10, 80))
+        minimap = self.make_random_invisible(minimap, percent_invisible=0.05)
+        minimap = cv2.GaussianBlur(minimap, (3, 3) if random.random() < 0.5 else (5, 5), 3)
 
-            # Retry if no valid positions were generated
-            if minimap is None or len(positions) == 0:
-                continue
+        #minimap = self.skew_image(minimap, skew_angle_deg_x=random.randint(-10, 10), skew_angle_deg_y=random.randint(-10, 10))
+        #minimap = self.rotate_image_randomly(minimap, angle_range=(-10, 10))
 
-            self.output_image_and_label(minimap, positions, data_name, is_train=is_train)
-            break
-        # (For later) add abilities
+        self.output_image_and_label(minimap, positions, data_name, is_train=is_train)
 
-    # Displays the ID and name of each class for putting in the yaml file
+
+    # Displays the ID and name of each class
     def display_class_names(self):
-        class_ids = self.get_class_ids()
         print("Class ID/Name to copy into yaml file:")
         print("names:")
-        for name, class_id in class_ids.items():
+        for name, class_id in self.class_ids.items():
             print(f"\t{class_id}: {name}")
+
+    # Creates an appropriate yaml file with the correct class names and IDs
+    def create_yaml_file(self, yaml_path="dataset.yaml"):
+        current_dir = os.getcwd()
+        yaml_path = os.path.join(current_dir, yaml_path)
+        with open(yaml_path, "w") as file:
+            file.write("path: dataset\n")
+            file.write("\n")
+            file.write("train: images/train\n")
+            file.write("val: images/val\n")
+            file.write("\n")
+            file.write("names:\n")
+            for name, class_id in self.class_ids.items():
+                file.write(f"  {class_id}: {name}\n")
   
 
         
