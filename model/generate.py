@@ -24,6 +24,7 @@ if __name__ == "__main__":
             print(f"\r{i}/{TRAIN_IMAGES_TO_MAKE} training images generated")
         data_name = f"{i:04d}"
         generator.generate_data(data_name, is_train=True)
+    generator.save_coco(is_train=True)
 
     print("Finished generating training images")
     print("Starting validation image generation...")
@@ -34,10 +35,12 @@ if __name__ == "__main__":
         data_name = f"{i:04d}"
         generator.generate_data(data_name, is_train=False)
 
+
     print("Finished generating validation images")
-    print("Creating YAML file...")
-    generator.create_yaml_file()
-    print("YAML file created")
+    
+    print("Creating COCO file...")
+    generator.save_coco(is_train=False)
+    print("COCO file created")
     print("Finished :)")
 
 
