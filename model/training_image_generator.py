@@ -5,6 +5,7 @@ import cv2
 import random
 import numpy as np
 import math
+import json
 
 """
 agent_icon_path: relative path to the folder with agent icons
@@ -31,6 +32,7 @@ class ImageGenerator:
         self.agent_icons = []
         self.map_layouts = []
         self.misc_icons = []
+
 
         # Takes in an image path and returns the image (as a numpy array) and the filename (without extension)
         def load_image(image_path):
@@ -66,6 +68,16 @@ class ImageGenerator:
 
         self.class_ids = {name: i for i, (_, name) in enumerate(self.agent_icons)}
 
+        self.coco_data = {
+            "images": [],
+            "annotations": [],
+            "categories": [
+                {"id": cid, "name": name} for name, cid in self.class_ids.items()
+            ]
+        }
+        self.image_id = 0
+        self.annotation_id = 0
+    
     # Pick a random minimap and return it as a numpy array
     def generate_map(self):
         minimap, _ = random.choice(self.map_layouts)
@@ -83,7 +95,7 @@ class ImageGenerator:
             agent_icon, agent_name = random.choice(self.agent_icons)
             agent_icon, inner_r, crop_pad = self.square_to_circle_with_border(image=agent_icon)
             agent_icon = self.rotate_image_randomly(agent_icon, angle_range=(-20, 20))
-            agent_icon = self.skew_image(agent_icon, skew_angle_deg_x=random.randint(-10, 10), skew_angle_deg_y=random.randint(-10, 10))
+            #agent_icon = self.skew_image(agent_icon, skew_angle_deg_x=random.randint(-10, 10), skew_angle_deg_y=random.randint(-10, 10))
 
             # Get dimensions of the minimap and agent icon
             minimap_height, minimap_width, _ = minimap.shape
@@ -374,49 +386,6 @@ class ImageGenerator:
 
         return background
 
-    # Takes in an image and a list of positions (as well as the file name) and creates/saves the label file and the image file for it
-    def output_image_and_label(self, image, positions, file_name, is_train=True):
-
-
-        current_dir = os.getcwd()
-
-        image_height = image.shape[0]
-        image_width = image.shape[1]
-
-        label_subdir = os.path.join("dataset", "labels", "train" if is_train else "val")
-        image_subdir = os.path.join("dataset", "images", "train" if is_train else "val")
-
-        # Make sure directories exist
-        os.makedirs(os.path.join(current_dir, label_subdir), exist_ok=True)
-        os.makedirs(os.path.join(current_dir, image_subdir), exist_ok=True)
-
-        # Write label data
-        label_path = os.path.join(current_dir, label_subdir, file_name + ".txt")
-        with open(label_path, "w") as file:
-            for position in positions:
-                class_id = self.class_ids[position["name"]]
-
-                box_width = position["width"]
-                box_height = position["height"]
-
-                x_center = (position["coordinates"][0] + box_width / 2) / image_width
-                y_center = (position["coordinates"][1] + box_height / 2) / image_height
-
-                width = box_width / image_width
-                height = box_height / image_height
-
-                # Only write valid bounding boxes
-                if width > 0 and height > 0 and 0 <= x_center <= 1 and 0 <= y_center <= 1:
-                    file.write(f"{class_id} {x_center} {y_center} {width} {height}\n")
-
-        # Save image data 
-        image_path = os.path.join(current_dir, image_subdir, file_name + ".png")
-        # Ensure image values are uint8 for cv2.imwrite
-        image_uint8 = (np.clip(image, 0, 1) * 255).astype(np.uint8) # Don't ask me why this part is here
-        success = cv2.imwrite(image_path, image_uint8)
-        if not success:
-            raise IOError(f"Failed to write image to {image_path}")
-
     def rotate_image_randomly(self, image, angle_range=(0, 360)):
         height, width = image.shape[:2]
         center = (width // 2, height // 2)
@@ -483,6 +452,69 @@ class ImageGenerator:
         image[mask] = 0
         return image
 
+    # Takes in an image and a list of positions (as well as the file name) and creates the image file and saves the position data to later make the COCO file
+    def output_image(self, image, positions, file_name, is_train=True):
+
+        current_dir = os.getcwd()
+
+        image_height = image.shape[0]
+        image_width = image.shape[1]
+
+        label_subdir = os.path.join("dataset", "labels", "train" if is_train else "val")
+        image_subdir = os.path.join("dataset", "images", "train" if is_train else "val")
+
+        # Make sure directories exist
+        os.makedirs(os.path.join(current_dir, label_subdir), exist_ok=True)
+        os.makedirs(os.path.join(current_dir, image_subdir), exist_ok=True)
+
+        # Save image data 
+        image_path = os.path.join(current_dir, image_subdir, file_name + ".png")
+        # Ensure image values are uint8 for cv2.imwrite
+        image_uint8 = (np.clip(image, 0, 1) * 255).astype(np.uint8) # Don't ask me why this part is here
+        success = cv2.imwrite(image_path, image_uint8)
+        if not success:
+            raise IOError(f"Failed to write image to {image_path}")
+
+
+        self.image_id += 1
+        image_entry = {
+            "id": self.image_id,
+            "file_name": file_name + ".png",
+            "width": image_width,
+            "height": image_height
+        }
+        self.coco_data["images"].append(image_entry)
+
+        for position in positions:
+            class_id = self.class_ids[position["name"]]
+
+            x_min = position["coordinates"][0]
+            y_min = position["coordinates"][1]
+            width = position["width"]
+            height = position["height"]
+
+            if width <= 0 or height <= 0:
+                continue
+
+            self.annotation_id += 1
+
+            annotation = {
+                "id": self.annotation_id,
+                "image_id": self.image_id,
+                "category_id": class_id,
+                "bbox": [x_min, y_min, width, height],
+                "area": width * height,
+                "iscrowd": 0
+            }
+
+            self.coco_data["annotations"].append(annotation)
+
+    def save_coco(self, is_train=True):
+        split = "train" if is_train else "val"
+        path = os.path.join("dataset", f"instances_{split}.json")
+
+        with open(path, "w") as f:
+            json.dump(self.coco_data, f, indent=4, default=int)
 
     # Takes in the name of the files you want to create and outputs an image and txt file with that name
     def generate_data(self, data_name, is_train=True):
@@ -492,16 +524,15 @@ class ImageGenerator:
         minimap = self.draw_misc(minimap, num_misc_to_draw=random.randint(10, 16))
         minimap, positions = self.draw_agents(minimap, num_agents_to_draw=random.randint(8, 20))
         minimap = self.add_gaussian_noise(minimap, sigma_range=(0.0, 0.01))
-        minimap = self.scale_artifact(minimap, scale_range=(0.2, 1.0))
-        minimap = self.apply_jpeg_compression(minimap, quality_range=(10, 80))
-        minimap = self.make_random_invisible(minimap, percent_invisible=0.05)
-        minimap = cv2.GaussianBlur(minimap, (3, 3) if random.random() < 0.5 else (5, 5), 3)
+        minimap = self.scale_artifact(minimap, scale_range=(0.5, 1.0))
+        minimap = self.apply_jpeg_compression(minimap, quality_range=(20, 100))
 
+        #minimap = self.make_random_invisible(minimap, percent_invisible=0.05)
+        #minimap = cv2.GaussianBlur(minimap, (3, 3) if random.random() < 0.5 else (5, 5), 3)
         #minimap = self.skew_image(minimap, skew_angle_deg_x=random.randint(-10, 10), skew_angle_deg_y=random.randint(-10, 10))
         #minimap = self.rotate_image_randomly(minimap, angle_range=(-10, 10))
 
-        self.output_image_and_label(minimap, positions, data_name, is_train=is_train)
-
+        self.output_image(minimap, positions, data_name, is_train=is_train)
 
     # Displays the ID and name of each class
     def display_class_names(self):
@@ -509,20 +540,6 @@ class ImageGenerator:
         print("names:")
         for name, class_id in self.class_ids.items():
             print(f"\t{class_id}: {name}")
-
-    # Creates an appropriate yaml file with the correct class names and IDs
-    def create_yaml_file(self, yaml_path="dataset.yaml"):
-        current_dir = os.getcwd()
-        yaml_path = os.path.join(current_dir, yaml_path)
-        with open(yaml_path, "w") as file:
-            file.write("path: dataset\n")
-            file.write("\n")
-            file.write("train: images/train\n")
-            file.write("val: images/val\n")
-            file.write("\n")
-            file.write("names:\n")
-            for name, class_id in self.class_ids.items():
-                file.write(f"  {class_id}: {name}\n")
   
 
         
