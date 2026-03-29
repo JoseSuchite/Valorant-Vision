@@ -516,6 +516,11 @@ class ImageGenerator:
         with open(path, "w") as f:
             json.dump(self.coco_data, f, indent=4, default=int)
 
+        self.coco_data["images"] = []
+        self.coco_data["annotations"] = []
+        self.annotation_id = 0
+        self.image_id = 0
+
     # Takes in the name of the files you want to create and outputs an image and txt file with that name
     def generate_data(self, data_name, is_train=True):
 
