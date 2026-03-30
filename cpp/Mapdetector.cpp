@@ -4,6 +4,7 @@
 #include <QDebug>
 #include <QProcess>
 #include <QFile>
+#include <QStandardPaths>
 
 static QString layoutPathForName(const QString& name) {
     if (name == "abyss")    return "map_layouts/Abyss_layout.png";
@@ -58,8 +59,9 @@ QString detectMapFromVideo(const std::string& videoPath) {
     cv::resize(bar, upscaled, cv::Size(), 3, 3, cv::INTER_CUBIC);
 
     // Save to a temp file for Tesseract to read
-    QString tempImage = "C:/Users/teena/AppData/Local/Temp/vv_bar.png";
-    QString tempText = "C:/Users/teena/AppData/Local/Temp/vv_bar";
+    QString tempDir = QStandardPaths::writableLocation(QStandardPaths::TempLocation);
+    QString tempImage = tempDir + "/vv_bar.png";
+    QString tempText = tempDir + "/vv_bar";
     cv::imwrite(tempImage.toStdString(), upscaled);
 
     // ── Run Tesseract ─────────────────────────────────────────────────────
