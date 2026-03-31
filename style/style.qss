@@ -35,3 +35,7 @@ QPushButton:hover{
     min-width: 10em;
     padding: 6px;
 }
+
+QVideoWidget{
+    border-color: red;
+}
