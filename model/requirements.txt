@@ -5,3 +5,4 @@ Pillow==12.1.1
 pycocotools==2.0.11
 torch==2.9.1
 torchvision==0.24.0
+lightning==2.6.1
