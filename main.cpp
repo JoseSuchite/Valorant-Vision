@@ -11,7 +11,7 @@
 #include <leptonica/allheaders.h>
 
 // ------------------------------------------------------------
-// RELATIVE COORDINATE SYSTEM
+// RELATIVE COORDINATE SYSTEM - adjust accordingly to trhe input
 // ------------------------------------------------------------
 struct RelRect {
     double x1, y1, x2, y2;
@@ -35,6 +35,7 @@ cv::Rect rel_to_rect(const RelRect& r, int img_w, int img_h) {
     return cv::Rect(x, y, w, h);
 }
 
+// to comment yet
 std::vector<std::string> extract_tokens(const std::string& raw) {
     std::vector<std::string> tokens;
     std::string cur;
@@ -228,7 +229,7 @@ std::string match_player(const std::string& ocr_text,
             evt.killer = good_matches[0].player;
             evt.victim = good_matches[1].player;
 
-            // 6. Reject self-kills (unless the game actually allows them)
+            // 6. Reject self-kills for now, as was seeing alot of them
             if (evt.killer == evt.victim) {
                 evt.killer.clear();
                 evt.victim.clear();
