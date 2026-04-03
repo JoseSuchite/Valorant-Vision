@@ -47,8 +47,6 @@ NeuralNetwork::NeuralNetwork(const T_CHAR *onnxFilePath, const int ROWS, const i
     for (auto &name : outputNodeNames) {
         outputNodeNamesCStyle.push_back(name.c_str());
     }
-
-	
 }
 
 NeuralNetwork::~NeuralNetwork() {
@@ -73,17 +71,15 @@ std::vector<float> NeuralNetwork::prepareImage(const cv::Mat &imageBGR) {
     return imageVector;
 }
 
-std::vector<Ort::Value> NeuralNetwork::predict(cv::Mat imageBGR) {
+Prediction NeuralNetwork::predict(cv::Mat imageBGR) {
 
     size_t input_tensor_size = 1 * 3 * ROWS * COLS;
-    //std::vector<float> input_tensor_values(input_tensor_size);
-    //for (unsigned int i = 0; i < input_tensor_size; i++) input_tensor_values[i] = (float)i / (input_tensor_size + 1);
 
     auto type_info = model->GetInputTypeInfo(0);
     auto tensor_info = type_info.GetTensorTypeAndShapeInfo();
     std::vector<int64_t> input_node_dims = tensor_info.GetShape();
-    for (auto d : input_node_dims)
-        std::cout << d << " ";
+    /*for (auto d : input_node_dims)
+        std::cout << d << " ";*/
 
     std::vector<float> imageVector = prepareImage(imageBGR);
 
@@ -101,47 +97,65 @@ std::vector<Ort::Value> NeuralNetwork::predict(cv::Mat imageBGR) {
             outputNodeNamesCStyle.data(),
             outputNodeNamesCStyle.size());
         std::cout << "Inference over" << std::endl;
-        std::cout << "Output vector names:" << std::endl;
-        for (auto name : outputNodeNames) {
-            std::cout << name << std::endl;
-        }
-
-
     }
     catch (const Ort::Exception &e) {
         std::cerr << "ONNX Runtime error during forward pass: " << e.what() << std::endl;
         throw(e);
     }
 
-    return outputTensor;
 
-   
+    // Get bounding boxes
+    float *boxesArr = outputTensor[0].GetTensorMutableData<float>();
+    auto info = outputTensor[0].GetTensorTypeAndShapeInfo();
+    std::cout << info.GetElementCount() << std::endl;
 
-   // return outputTensor;
+    // Get labels
+    int64_t *labelsArr = outputTensor[1].GetTensorMutableData<int64_t>();
+    size_t labelsLength = outputTensor[1].GetTensorTypeAndShapeInfo().GetElementCount();
 
+    // Get scores
+    float *scoresArr = outputTensor[2].GetTensorMutableData<float>();
+    size_t scoresLength = outputTensor[2].GetTensorTypeAndShapeInfo().GetElementCount();
+
+    Prediction prediction;
+    prediction.length = 0;
+    for (int i = 0; i < labelsLength; i++) { //Length of labels and scores *should* be equal, so I just arbitrarily picked one
+        prediction.length++;
+
+        //Each bounding box is stored as 4 points, so add them
+        Box box;
+        box.xmin = boxesArr[4 * i];
+        box.ymin = boxesArr[4 * i + 1];
+        box.xmax = boxesArr[4 * i + 2];
+        box.ymax = boxesArr[4 * i + 3];
+        prediction.boundingBoxes.push_back(box);
+
+        //Add the label and score
+        prediction.labels.push_back(labelsArr[i]);
+        prediction.scores.push_back(scoresArr[i]);
+    }
+
+    return prediction;
 
 }
 
-void NeuralNetwork::outputImageWithBoxesAndLabels(const cv::Mat image, const float *boundingBoxes, const int64_t *labels, const float *scores, const int N, const float threshold) {
+void NeuralNetwork::outputImageWithBoxesAndLabels(const cv::Mat image, const Prediction prediction, const float threshold) {
     
     //Resize the image to what's used internally
     cv::Mat resizedImg;
     cv::resize(image, resizedImg, cv::Size(COLS, ROWS));
 
-    for (int i = 0; i < N; i++) {
-        if (scores[i] < threshold) { continue; }
+    for (int i = 0; i < prediction.length; i++) {
+        if (prediction.scores[i] < threshold) { continue; }
 
-        int xmin = boundingBoxes[4 * i];
-        int ymin = boundingBoxes[4 * i + 1];
-        int xmax = boundingBoxes[4 * i + 2];
-        int ymax = boundingBoxes[4 * i + 3];
+        Box box = prediction.boundingBoxes[i];
 
-        cv::String text = std::to_string(labels[i]) + ": " + std::to_string((int) (scores[i] * 100)) + "%";
+        cv::String text = std::to_string(prediction.labels[i]) + ": " + std::to_string((int) (prediction.scores[i] * 100)) + "%";
 
-        cv::putText(resizedImg, text, cv::Point(xmin, ymin - 10), cv::FONT_HERSHEY_SIMPLEX, 0.4, cv::Scalar(0, 0, 0), 3, cv::LINE_AA);
-        cv::putText(resizedImg, text, cv::Point(xmin, ymin - 10), cv::FONT_HERSHEY_SIMPLEX, 0.4, cv::Scalar(0, 255, 0), 2, cv::LINE_AA);
+        cv::putText(resizedImg, text, cv::Point(box.xmin, box.ymin - 10), cv::FONT_HERSHEY_SIMPLEX, 0.4, cv::Scalar(0, 0, 0), 3, cv::LINE_AA);
+        cv::putText(resizedImg, text, cv::Point(box.xmin, box.ymin - 10), cv::FONT_HERSHEY_SIMPLEX, 0.4, cv::Scalar(0, 255, 0), 2, cv::LINE_AA);
 
-        cv::rectangle(resizedImg, cv::Rect(xmin, ymin, xmax - xmin, ymax-ymin), cv::Scalar(0, 0, 255), 2);
+        cv::rectangle(resizedImg, cv::Rect(box.xmin, box.ymin, box.xmax - box.xmin, box.ymax - box.ymin), cv::Scalar(0, 0, 255), 2);
 
     }
     cv::imwrite("image_labeled.png", resizedImg);
