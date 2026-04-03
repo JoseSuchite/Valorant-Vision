@@ -17,6 +17,20 @@ typedef char T_CHAR;
 #define T_TEXT(quote) quote
 #endif
 
+struct Box {
+	int xmin;
+	int ymin;
+	int xmax;
+	int ymax;
+};
+
+struct Prediction {
+	size_t length;
+	std::vector<Box> boundingBoxes;
+	std::vector<int64_t> labels;
+	std::vector<float> scores;
+};
+
 class NeuralNetwork {
 
 private:
@@ -44,11 +58,11 @@ public:
 	NeuralNetwork(const T_CHAR *onnxFilePath, const int ROWS, const int COLS);
 	~NeuralNetwork();
 
-	//Takes in an image in opencv BGR format and returns predictions on it
-	std::vector<Ort::Value> predict(cv::Mat imageBGR);
+	//Takes in an image in opencv BGR format and returns prediction on it
+	Prediction predict(cv::Mat imageBGR);
 
 	//Outputs an image file with predictions drawn on it. Takes in the image, arrays of bounding boxes, labels, and scores, the amount of predictions (N), and a threshold for scores to show up
-	void outputImageWithBoxesAndLabels(const cv::Mat image, const float *boundingBoxes, const int64_t *labels, const float *scores, const int N, const float threshold);
+	void outputImageWithBoxesAndLabels(const cv::Mat image, const Prediction prediction, const float threshold);
 
 };
 
