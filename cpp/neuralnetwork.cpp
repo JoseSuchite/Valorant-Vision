@@ -3,10 +3,14 @@
 #include <cstdlib>
 #include <filesystem>
 #include <iostream>
+
+
 #include <onnxruntime_cxx_api.h>
 
+NeuralNetwork::NeuralNetwork(const T_CHAR *onnxFilePath, const int ROWS, const int COLS) {
 
-NeuralNetwork::NeuralNetwork(const T_CHAR *onnxFilePath) {
+    this->ROWS = ROWS;
+    this->COLS = COLS;
 
     //Set up environment and session options
 	env = new Ort::Env(ORT_LOGGING_LEVEL_WARNING, "Valorant-Vision Model");
@@ -54,18 +58,37 @@ NeuralNetwork::~NeuralNetwork() {
 	env = nullptr;
 }
 
-void NeuralNetwork::forwardPass() {
+std::vector<float> NeuralNetwork::prepareImage(const cv::Mat &imageBGR) {
+    cv::Mat imageBlob = cv::dnn::blobFromImage(imageBGR,
+        1.0 / 255.0, //Standardize images 
+        cv::Size(COLS, ROWS),
+        cv::Scalar(),
+        true, //Convert from BGR to RGB (which is what the model uses)
+        false);
 
-    size_t input_tensor_size = 3 * 384 * 384;
-    std::vector<float> input_tensor_values(input_tensor_size);
-    for (unsigned int i = 0; i < input_tensor_size; i++) input_tensor_values[i] = (float)i / (input_tensor_size + 1);
+    //Turn the image into a vector of floats
+    std::vector<float> imageVector(imageBlob.total());
+    std::memcpy(imageVector.data(), imageBlob.ptr<float>(), imageBlob.total() * sizeof(float));
+
+    return imageVector;
+}
+
+std::vector<Ort::Value> NeuralNetwork::predict(cv::Mat imageBGR) {
+
+    size_t input_tensor_size = 1 * 3 * ROWS * COLS;
+    //std::vector<float> input_tensor_values(input_tensor_size);
+    //for (unsigned int i = 0; i < input_tensor_size; i++) input_tensor_values[i] = (float)i / (input_tensor_size + 1);
 
     auto type_info = model->GetInputTypeInfo(0);
     auto tensor_info = type_info.GetTensorTypeAndShapeInfo();
     std::vector<int64_t> input_node_dims = tensor_info.GetShape();
+    for (auto d : input_node_dims)
+        std::cout << d << " ";
+
+    std::vector<float> imageVector = prepareImage(imageBGR);
 
     auto memory_info = Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
-    Ort::Value input_tensor = Ort::Value::CreateTensor<float>(memory_info, input_tensor_values.data(), input_tensor_size, input_node_dims.data(), 4);
+    Ort::Value input_tensor = Ort::Value::CreateTensor<float>(memory_info, imageVector.data(), input_tensor_size, input_node_dims.data(), 4);
 
     std::vector<Ort::Value> outputTensor;
 
@@ -74,12 +97,52 @@ void NeuralNetwork::forwardPass() {
         outputTensor = model->Run(Ort::RunOptions{ nullptr },
             inputNodeNamesCStyle.data(),
             &input_tensor,
-            1,
+            inputNodeNamesCStyle.size(),
             outputNodeNamesCStyle.data(),
-            1);
+            outputNodeNamesCStyle.size());
         std::cout << "Inference over" << std::endl;
+        std::cout << "Output vector names:" << std::endl;
+        for (auto name : outputNodeNames) {
+            std::cout << name << std::endl;
+        }
+
+
     }
     catch (const Ort::Exception &e) {
         std::cerr << "ONNX Runtime error during forward pass: " << e.what() << std::endl;
+        throw(e);
     }
+
+    return outputTensor;
+
+   
+
+   // return outputTensor;
+
+
+}
+
+void NeuralNetwork::outputImageWithBoxesAndLabels(const cv::Mat image, const float *boundingBoxes, const int64_t *labels, const float *scores, const int N, const float threshold) {
+    
+    //Resize the image to what's used internally
+    cv::Mat resizedImg;
+    cv::resize(image, resizedImg, cv::Size(COLS, ROWS));
+
+    for (int i = 0; i < N; i++) {
+        if (scores[i] < threshold) { continue; }
+
+        int xmin = boundingBoxes[4 * i];
+        int ymin = boundingBoxes[4 * i + 1];
+        int xmax = boundingBoxes[4 * i + 2];
+        int ymax = boundingBoxes[4 * i + 3];
+
+        cv::String text = std::to_string(labels[i]) + ": " + std::to_string((int) (scores[i] * 100)) + "%";
+
+        cv::putText(resizedImg, text, cv::Point(xmin, ymin - 10), cv::FONT_HERSHEY_SIMPLEX, 0.4, cv::Scalar(0, 0, 0), 3, cv::LINE_AA);
+        cv::putText(resizedImg, text, cv::Point(xmin, ymin - 10), cv::FONT_HERSHEY_SIMPLEX, 0.4, cv::Scalar(0, 255, 0), 2, cv::LINE_AA);
+
+        cv::rectangle(resizedImg, cv::Rect(xmin, ymin, xmax - xmin, ymax-ymin), cv::Scalar(0, 0, 255), 2);
+
+    }
+    cv::imwrite("image_labeled.png", resizedImg);
 }
