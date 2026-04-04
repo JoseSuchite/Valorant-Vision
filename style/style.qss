@@ -1,0 +1,41 @@
+/* rgb(241, 241, 241) (white) */
+/* rgb(14, 14, 14) (black) */
+/* rgb(255, 70, 85) (red) */
+/* rgb(7, 187, 171) (blue) */
+
+
+QPushButton{
+    background-color: rgb(241, 241, 241); /* LIGHT MODE */
+    border-color: rgb(255, 70, 85); /* LIGHT MODE */
+    background-color: rgb(14, 14, 14); /* DARK MODE */
+    border-color: rgb(7, 187, 171); /* DARK MODE */
+    border-style: outset;
+    border-width: 2px;
+    border-radius: 10px;
+    font: bold 14px;
+    min-width: 10em;
+    padding: 6px;
+}
+
+QPushButton:pressed{
+    background-color: rgb(224, 0, 0);
+    border-style: inset;
+}
+
+QPushButton:hover{
+    border-color: rgb(241, 241, 241); /* LIGHT MODE */
+    background-color: rgb(255, 70, 85); /* LIGHT MODE */
+    border-color: rgb(14, 14, 14); /* DARK MODE */
+    background-color: rgb(7, 187, 171); /* DARK MODE */
+    color: black;
+    border-style: outset;
+    border-width: 2px;
+    border-radius: 10px;
+    font: bold 14px;
+    min-width: 10em;
+    padding: 6px;
+}
+
+QVideoWidget{
+    border-color: red;
+}
