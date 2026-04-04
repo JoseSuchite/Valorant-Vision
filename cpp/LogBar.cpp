@@ -11,7 +11,7 @@ LogBar::LogBar(QWidget *parentAddress) : QDockWidget("Logs", parentAddress) {
 	// Comment the bottom line out, if we want to allow the bar to be hidden too (Close it).
 	setFeatures(QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetFloatable);
 
-	setAllowedAreas(Qt::RightDockWidgetArea);
+	setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
 }
 
 // Able to add message to the side bar

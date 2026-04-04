@@ -4,6 +4,9 @@
 #include <QMainWindow>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
+#include <QSlider>
+#include <QPixmap>
+#include <QLabel>
 
 #include "../headers/logbar.h"
 #include "../headers/videoplayer.h"
@@ -16,14 +19,16 @@ private:
 
 	QWidget *centralWidget;
 	QVBoxLayout *mainVerticalLayout;
-	QHBoxLayout *topRow;
-	QHBoxLayout *bottomRow;
+	QHBoxLayout *controlPanel;
 	VideoPlayer *player;
 	QPushButton *chooseFileButton;
 	QPushButton *pauseButton;
 	QPushButton *logButton;
 	LogBar *logBar;
 	Minimap* minimap_wid;
+	QSlider *volumeSlider;
+	QPixmap *pixmap;
+	QLabel *picLabel;
 
 
 	//Prompts user to select a file from the file browser and then calls the video player to play it

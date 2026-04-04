@@ -25,6 +25,9 @@ public:
 
 	//Pauses or plays video (depends on state)
 	void pauseOrPlayVideo();
+
+	//Sets volume for the player
+	void setVolume(float volume);
 };
 
 #endif

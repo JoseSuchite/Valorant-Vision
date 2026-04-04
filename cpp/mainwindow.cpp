@@ -3,9 +3,13 @@
 #include <QWidget>
 #include <QMainWindow>
 #include <QVBoxLayout>
+#include <QHBoxLayout>
 #include <QPushButton>
 #include <QFileDialog>
 #include <QObject>
+#include <QFileInfo>
+#include <QPixmap>
+#include <QLabel>
 
 #include "../headers/logbar.h"
 #include "../headers/mainwindow.h"
@@ -30,8 +34,20 @@ MainWindow::MainWindow() :
         addDockWidget(Qt::RightDockWidgetArea, minimap_wid);
         minimap_wid->loadImage("map_layouts/Ascent_layout.png");
         player = new VideoPlayer(centralWidget);
+        mainVerticalLayout = new QVBoxLayout(centralWidget);
+        controlPanel = new QHBoxLayout(centralWidget);
         chooseFileButton = new QPushButton("Select Video", centralWidget);
+
+        QPixmap pixmap(":/images/logo.png");
+        picLabel = new QLabel();
+        picLabel->setPixmap(pixmap);
+
         pauseButton = new QPushButton("Pause/Play", centralWidget);
+
+        volumeSlider = new QSlider(Qt::Horizontal, this);
+        volumeSlider->setRange(0, 100);
+        volumeSlider->setValue(100);
+
         logButton = new QPushButton("Reset Log Bar", centralWidget);
 
         // removed QObject as it was not needed, as they are calling their own functions.
@@ -39,39 +55,45 @@ MainWindow::MainWindow() :
         connect(pauseButton, &QPushButton::clicked, this, &MainWindow::pauseOrPlayVideo);
         connect(logButton, &QPushButton::clicked, this, &MainWindow::resetBar);
 
+        QObject::connect(volumeSlider, &QSlider::valueChanged, this, [this](int value) {player->setVolume(value / 100.0f);});
+
         this->setCentralWidget(centralWidget);
 
-        // add the buttons to their respective layout like top or bottom
-        topRow->addWidget(chooseFileButton);
-        topRow->addWidget(logButton);
-        bottomRow->addWidget(pauseButton);
+        controlPanel->addWidget(pauseButton);
+        controlPanel->addWidget(volumeSlider);
 
-        // format the layout of the buttons and player
-        mainVerticalLayout->addLayout(topRow);
+        mainVerticalLayout->addWidget(picLabel);
         mainVerticalLayout->addWidget(player);
-        mainVerticalLayout->addLayout(bottomRow);
+        mainVerticalLayout->addWidget(chooseFileButton);
+        mainVerticalLayout->addLayout(controlPanel);
+        mainVerticalLayout->addWidget(logButton);
 
-        // resizes the select video button
-        chooseFileButton->setFixedSize(120, 40);
-        chooseFileButton->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-
-        // resizes the reset log button
-        logButton->setFixedSize(120, 40);
-        logButton->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-
-        //resizes the pause/play button
-        pauseButton->setFixedSize(120, 40);
-        pauseButton->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-
-        //player->hide();
+        volumeSlider->hide();
+        pauseButton->hide();
+        logBar->hide();
+        logButton->hide();
+        player->hide();
         this->show();
 }
 
 void MainWindow::openAndPlayVideoOnClick() {
 
     QString QSource = QFileDialog::getOpenFileName(this, tr("Open Video"), "C:", tr("*.mp4 *.mp3"));
+
+    QFileInfo fileInfo(QSource);
+    if (!fileInfo.exists() || !fileInfo.isFile()) {
+        logBar->addLog("Invalid file selected.");
+        return;
+    }
+
     std::string source = QSource.toStdString();
 
+    volumeSlider->show();
+    chooseFileButton->hide();
+    picLabel->hide();
+    pauseButton->show();
+    logBar->show();
+    logButton->show();
     player->show();
     player->displayVideo(source);
     logBar->addLog("Video Loaded.");
