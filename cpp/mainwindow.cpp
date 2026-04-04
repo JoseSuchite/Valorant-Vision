@@ -24,9 +24,7 @@ MainWindow::MainWindow() :
         setWindowIcon(QIcon(":/images/logo.png"));
 
         centralWidget = new QWidget(this);
-        topRow = new QHBoxLayout();
         mainVerticalLayout = new QVBoxLayout(centralWidget);
-        bottomRow = new QHBoxLayout();
 
         logBar = new LogBar(this);
         addDockWidget(Qt::RightDockWidgetArea, logBar);
@@ -34,7 +32,6 @@ MainWindow::MainWindow() :
         addDockWidget(Qt::RightDockWidgetArea, minimap_wid);
         minimap_wid->loadImage("map_layouts/Ascent_layout.png");
         player = new VideoPlayer(centralWidget);
-        mainVerticalLayout = new QVBoxLayout(centralWidget);
         controlPanel = new QHBoxLayout(centralWidget);
         chooseFileButton = new QPushButton("Select Video", centralWidget);
 
@@ -68,6 +65,7 @@ MainWindow::MainWindow() :
         mainVerticalLayout->addLayout(controlPanel);
         mainVerticalLayout->addWidget(logButton);
 
+        minimap_wid->hide();
         volumeSlider->hide();
         pauseButton->hide();
         logBar->hide();
@@ -88,9 +86,10 @@ void MainWindow::openAndPlayVideoOnClick() {
 
     std::string source = QSource.toStdString();
 
-    volumeSlider->show();
     chooseFileButton->hide();
     picLabel->hide();
+    volumeSlider->show();
+    minimap_wid->show();
     pauseButton->show();
     logBar->show();
     logButton->show();
