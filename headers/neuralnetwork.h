@@ -17,15 +17,17 @@ typedef char T_CHAR;
 #define T_TEXT(quote) quote
 #endif
 
+// Struct for the coordinates of a prediction box
 struct Box {
-	int xmin;
-	int ymin;
-	int xmax;
-	int ymax;
+	int xmin = 0;
+	int ymin = 0;
+	int xmax = 0;
+	int ymax = 0;
 };
 
+// struct for holding the results of a prediction
 struct Prediction {
-	size_t length;
+	size_t length = 0;
 	std::vector<Box> boundingBoxes;
 	std::vector<int64_t> labels;
 	std::vector<float> scores;
@@ -44,7 +46,7 @@ private:
 	//Storing an std::string version and a c-style version separaretly
 	//We need c-style to pass into the model but that gets really annoying and yes I know this is ineffecient but like, it's like 4 extra strings
 	//The model has over 40 million parameters
-	//I think we will live
+	//I think we'll live
 	std::vector<std::string> inputNodeNames;
 	std::vector<const char *> inputNodeNamesCStyle;
 	std::vector<std::string> outputNodeNames;
@@ -63,7 +65,6 @@ public:
 
 	//Outputs an image file with predictions drawn on it. Takes in the image, arrays of bounding boxes, labels, and scores, the amount of predictions (N), and a threshold for scores to show up
 	void outputImageWithBoxesAndLabels(const cv::Mat image, const Prediction prediction, const float threshold);
-
 };
 
 #endif
