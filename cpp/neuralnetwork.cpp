@@ -58,8 +58,8 @@ NeuralNetwork::~NeuralNetwork() {
 
 std::vector<float> NeuralNetwork::prepareImage(const cv::Mat &imageBGR) {
     cv::Mat imageBlob = cv::dnn::blobFromImage(imageBGR,
-        1.0 / 255.0, //Standardize images 
-        cv::Size(COLS, ROWS),
+        1.0 / 255.0, //Standardize pixel values
+        cv::Size(COLS, ROWS), //Standardize image size
         cv::Scalar(),
         true, //Convert from BGR to RGB (which is what the model uses)
         false);
@@ -78,8 +78,6 @@ Prediction NeuralNetwork::predict(cv::Mat imageBGR) {
     auto type_info = model->GetInputTypeInfo(0);
     auto tensor_info = type_info.GetTensorTypeAndShapeInfo();
     std::vector<int64_t> input_node_dims = tensor_info.GetShape();
-    /*for (auto d : input_node_dims)
-        std::cout << d << " ";*/
 
     std::vector<float> imageVector = prepareImage(imageBGR);
 
@@ -152,6 +150,7 @@ void NeuralNetwork::outputImageWithBoxesAndLabels(const cv::Mat image, const Pre
 
         cv::String text = std::to_string(prediction.labels[i]) + ": " + std::to_string((int) (prediction.scores[i] * 100)) + "%";
 
+        //Put label text on screen (the first one is to give an outline to the text (it is really hard to read otherwise))
         cv::putText(resizedImg, text, cv::Point(box.xmin, box.ymin - 10), cv::FONT_HERSHEY_SIMPLEX, 0.4, cv::Scalar(0, 0, 0), 3, cv::LINE_AA);
         cv::putText(resizedImg, text, cv::Point(box.xmin, box.ymin - 10), cv::FONT_HERSHEY_SIMPLEX, 0.4, cv::Scalar(0, 255, 0), 2, cv::LINE_AA);
 
