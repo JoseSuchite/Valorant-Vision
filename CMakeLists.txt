@@ -18,9 +18,11 @@ add_executable(Valorant-Vision
     "cpp/videoplayer.cpp"
     "cpp/mainwindow.cpp"
     "cpp/LogBar.cpp"
+    "cpp/minimap.cpp"
     "headers/videoplayer.h"
     "headers/mainwindow.h"
     "headers/logbar.h"
+    "headers/minimap.h"
 )
 
 # Link Qt + OpenCV
