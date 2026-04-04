@@ -1,0 +1,47 @@
+from training_image_generator import ImageGenerator
+import os
+import sys
+
+TRAIN_IMAGES_TO_MAKE = 1024
+INTERVAL_BETWEEN_PRINTS = 20
+
+if len(sys.argv) == 2:
+    TRAIN_IMAGES_TO_MAKE = int(sys.argv[1])
+else:
+    print(f"Number of images not specified, defaulting to {TRAIN_IMAGES_TO_MAKE}")
+
+VAL_IMAGES_TO_MAKE = int(TRAIN_IMAGES_TO_MAKE / 4)
+
+if __name__ == "__main__":
+    current_dir = os.getcwd()
+    generator = ImageGenerator(agent_icon_path=current_dir+"/agent_icons", 
+                            minimap_path=current_dir+"/map_layouts",
+                            misc_icon_path=current_dir+"/misc_icons")
+    print("Starting training image generation...")
+
+    for i in range(TRAIN_IMAGES_TO_MAKE):
+        if i % INTERVAL_BETWEEN_PRINTS == 0:
+            print(f"\r{i}/{TRAIN_IMAGES_TO_MAKE} training images generated")
+        data_name = f"{i:04d}"
+        generator.generate_data(data_name, is_train=True)
+    generator.save_coco(is_train=True)
+
+    print("Finished generating training images")
+    print("Starting validation image generation...")
+
+    for i in range(VAL_IMAGES_TO_MAKE):
+        if i % INTERVAL_BETWEEN_PRINTS == 0:
+            print(f"\r{i}/{VAL_IMAGES_TO_MAKE} validation images generated")
+        data_name = f"{i:04d}"
+        generator.generate_data(data_name, is_train=False)
+
+
+    print("Finished generating validation images")
+    
+    print("Creating COCO file...")
+    generator.save_coco(is_train=False)
+    print("COCO file created")
+    print("Finished :)")
+
+
+    #generator.display_class_names()    

@@ -6,7 +6,6 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
-
 # Find Qt6
 find_package(Qt6 COMPONENTS Widgets MultimediaWidgets Multimedia REQUIRED)
 
@@ -17,13 +16,11 @@ find_package(OpenCV REQUIRED)
 add_executable(Valorant-Vision
     "cpp/main.cpp"
     "cpp/videoplayer.cpp"
-    "headers/videoplayer.h"
-    "headers/mainwindow.h"
     "cpp/mainwindow.cpp"
     "cpp/LogBar.cpp"
+    "headers/videoplayer.h"
+    "headers/mainwindow.h"
     "headers/logbar.h"
-    "cpp/minimap.cpp"
-    "headers/minimap.h"
 )
 
 # Link Qt + OpenCV
@@ -33,6 +30,7 @@ target_link_libraries(Valorant-Vision
     Qt6::MultimediaWidgets
     ${OpenCV_LIBS}
 )
+
 
 # adds the minimap folder to the .exe directory
 add_custom_command(
@@ -51,3 +49,4 @@ target_sources(Valorant-Vision PRIVATE ${APP_RESOURCES})
 message(STATUS "Qt6_DIR: ${Qt6_DIR}") 
 message(STATUS "OpenCV version: ${OpenCV_VERSION}")
 message(STATUS "OpenCV include dirs: ${OpenCV_INCLUDE_DIRS}")
+message(STATUS "OpenCV included libs: ${OpenCV_LIBS}")
