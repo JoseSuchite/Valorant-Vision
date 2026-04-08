@@ -10,14 +10,10 @@ find_package(OpenCV REQUIRED)
 # Find Tesseract
 find_package(Tesseract CONFIG REQUIRED)
 
-# Find Leptonica (Tesseract depends on it)
-find_package(Leptonica REQUIRED)
-
 # Include directories
 include_directories(
     ${OpenCV_INCLUDE_DIRS}
     ${Tesseract_INCLUDE_DIRS}
-    ${Leptonica_INCLUDE_DIRS}
 )
 
 # Build executable
@@ -27,5 +23,4 @@ add_executable(ocr_detector main.cpp)
 target_link_libraries(ocr_detector
     ${OpenCV_LIBS}
     Tesseract::libtesseract
-    ${Leptonica_LIBRARIES}
 )

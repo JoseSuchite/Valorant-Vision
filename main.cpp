@@ -60,7 +60,10 @@ std::vector<std::string> extract_tokens(const std::string& raw) {
 // ------------------------------------------------------------
 std::string ocr_region(tesseract::TessBaseAPI& tess, const cv::Mat& roi) {
     cv::Mat gray;
-    cv::cvtColor(roi, gray, cv::COLOR_BGR2GRAY);
+    if (roi.channels() == 3)
+        cv::cvtColor(roi, gray, cv::COLOR_BGR2GRAY);
+    else
+        gray = roi.clone();
 
     // upscale
     cv::Mat big;
@@ -183,7 +186,7 @@ std::string match_player(const std::string& ocr_text,
         };
         
         KillEvent resolve_killfeed_whole(const std::string& raw,
-                                 const std::vector<std::string>& players)
+                                 const std::vector<std::string>& players, bool player_list_valid)
         {
             KillEvent evt;
 
@@ -191,7 +194,15 @@ std::string match_player(const std::string& ocr_text,
             auto tokens = extract_tokens(raw);
             if (tokens.empty())
                 return evt;
-
+            
+            // Fallback mode: no player list
+            if (!player_list_valid) {
+                if (tokens.size() >= 2) {
+                    evt.killer = tokens[0];
+                    evt.victim = tokens[1];
+                }
+                return evt;
+            }
             struct Match {
                 std::string token;
                 std::string player;
@@ -238,6 +249,44 @@ std::string match_player(const std::string& ocr_text,
             return evt;
         }
 
+        std::string ocr_team_name(tesseract::TessBaseAPI& tess, const cv::Mat& roi)
+        {
+            tess.SetPageSegMode(tesseract::PSM_SINGLE_WORD);
+            tess.SetVariable("tessedit_char_whitelist",
+                "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789");
+
+            return ocr_region(tess, roi);
+        }
+        
+        std::string resolve_team_name(const std::string& raw,
+                              const std::vector<std::string>& teams)
+        {
+            std::string token = normalize(raw);
+            if (token.empty())
+                return "";
+
+            bool mostly_alpha = std::count_if(token.begin(), token.end(), ::isalpha) >= token.size() - 1;
+            if (!mostly_alpha)
+                return "";
+
+            int best_dist = 9999;
+            std::string best_team;
+
+            for (auto& t : teams) {
+                int d = levenshtein_distance(token, normalize(t));
+                if (d < best_dist) {
+                    best_dist = d;
+                    best_team = t;
+                }
+            }
+
+            // STRICT threshold for team names
+            if (best_dist <= 2)
+                return best_team;
+
+            return "";
+        }
+
 
         // ------------------------------------------------------------
         // MAIN
@@ -256,9 +305,18 @@ std::string match_player(const std::string& ocr_text,
 
         // Load player list
         auto players = load_player_list(player_list_path);
+        std::unordered_set<std::string> seen_teams;
+        std::vector<std::string> team_names = {
+            "NRG", "PRX", "LOUD", "SEN", "EG", "TL", "FNC", "T1", "G2", "KRU", "LEV"
+        };
+
+        
+        bool player_list_valid = true;
+
         if (players.empty()) {
-            std::cerr << "Player list is empty.\n";
-            return 1;
+            std::cout << "[Warning] player_list.txt missing or empty. "
+                        "Falling back to best OCR detection.\n";
+            player_list_valid = false;
         }
 
         // Open video
@@ -279,9 +337,12 @@ std::string match_player(const std::string& ocr_text,
 
 
         // Define ROIs (relative)
-        RelRect left_score_rel  = to_rel_from_abs(770, 0, 840, 60);
-        RelRect right_score_rel = to_rel_from_abs(1040, 0, 1110, 60);
+        RelRect left_score_rel  = to_rel_from_abs(800, 0, 860, 60);
+        RelRect right_score_rel = to_rel_from_abs(1060, 0, 1120, 60);
         RelRect round_timer_rel = to_rel_from_abs(880, 0, 1010, 67);
+        RelRect team_left_rel  = to_rel_from_abs(720, 10, 790, 38);
+        RelRect team_right_rel = to_rel_from_abs(1130, 10, 1200, 38);
+
 
         // WHOLE killfeed area
         RelRect killfeed_rel_0 = to_rel_from_abs(1291,  90, 1898, 130);  // newest
@@ -297,12 +358,19 @@ std::string match_player(const std::string& ocr_text,
         std::string last_kill_signature = "";
         std::unordered_set<std::string> seen_kills;
 
+        double video_start = (double)cv::getTickCount() / cv::getTickFrequency();
+        bool team_detected = false;
+
+
         while (true) {
             cv::Mat frame;
             if (!cap.read(frame)) {
                 std::cout << "End of video.\n";
                 break;
             }
+            double now = (double)cv::getTickCount() / cv::getTickFrequency();
+            double elapsed = now - video_start;
+
 
             int img_w = frame.cols;
             int img_h = frame.rows;
@@ -315,6 +383,8 @@ std::string match_player(const std::string& ocr_text,
             cv::Rect killfeed_roi_1 = rel_to_rect(killfeed_rel_1, img_w, img_h);
             cv::Rect killfeed_roi_2 = rel_to_rect(killfeed_rel_2, img_w, img_h);
             cv::Rect killfeed_roi_3 = rel_to_rect(killfeed_rel_3, img_w, img_h);
+            cv::Rect team_left_roi  = rel_to_rect(team_left_rel,  img_w, img_h);
+            cv::Rect team_right_roi = rel_to_rect(team_right_rel, img_w, img_h);
 
 
             // Clamp ROIs
@@ -326,6 +396,25 @@ std::string match_player(const std::string& ocr_text,
             clamp(killfeed_roi_1);
             clamp(killfeed_roi_2);
             clamp(killfeed_roi_3);
+            clamp(team_left_roi);
+            clamp(team_right_roi);
+            
+            if (!team_detected && elapsed >= 8.0) {
+                // OCR team names
+                std::string raw_left_team  = ocr_team_name(tess, frame(team_left_roi));
+                std::string raw_right_team = ocr_team_name(tess, frame(team_right_roi));
+        
+                std::string left_team  = resolve_team_name(raw_left_team, team_names);
+                std::string right_team = resolve_team_name(raw_right_team, team_names);
+                
+                if (!left_team.empty() && !right_team.empty()) {
+                    std::cout << "raw temas: " << raw_left_team << " vs " << raw_right_team << '\n';
+                    std::cout << "Teams detected: "
+                    << left_team << " vs " << right_team << "\n";
+                    
+                    team_detected = true;   // lock it so it prints only once
+                }
+            }
 
             // --- SCORE OCR ---
             tess.SetPageSegMode(tesseract::PSM_SINGLE_CHAR);
@@ -340,7 +429,7 @@ std::string match_player(const std::string& ocr_text,
                 "0123456789:ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz");
 
             std::string round_timer = ocr_region(tess, frame(round_timer_roi));
-
+            
             // --- KILLFEED OCR (whole area) ---
             tess.SetPageSegMode(tesseract::PSM_SPARSE_TEXT);
             tess.SetVariable("tessedit_char_whitelist",
@@ -352,10 +441,10 @@ std::string match_player(const std::string& ocr_text,
             std::string raw3 = ocr_region(tess, frame(killfeed_roi_3));
 
             // Resolve killfeed
-            KillEvent evt0 = resolve_killfeed_whole(raw0, players);
-            KillEvent evt1 = resolve_killfeed_whole(raw1, players);
-            KillEvent evt2 = resolve_killfeed_whole(raw2, players);
-            KillEvent evt3 = resolve_killfeed_whole(raw3, players);
+            KillEvent evt0 = resolve_killfeed_whole(raw0, players, player_list_valid);
+            KillEvent evt1 = resolve_killfeed_whole(raw1, players, player_list_valid);
+            KillEvent evt2 = resolve_killfeed_whole(raw2, players, player_list_valid);
+            KillEvent evt3 = resolve_killfeed_whole(raw3, players, player_list_valid);
 
             auto try_print = [&](const KillEvent& evt) {
                 if (evt.killer.empty() || evt.victim.empty())
@@ -377,6 +466,7 @@ std::string match_player(const std::string& ocr_text,
             try_print(evt2);
             try_print(evt3);
 
+
             // --- Debug view ---
             cv::rectangle(frame, left_score_roi,  cv::Scalar(0,255,0), 2);
             cv::rectangle(frame, right_score_roi, cv::Scalar(255,0,0), 2);
@@ -385,6 +475,8 @@ std::string match_player(const std::string& ocr_text,
             cv::rectangle(frame, killfeed_roi_1,    cv::Scalar(255,255,255), 2);
             cv::rectangle(frame, killfeed_roi_2,    cv::Scalar(255,255,255), 2);
             cv::rectangle(frame, killfeed_roi_3,    cv::Scalar(255,255,255), 2);
+            cv::rectangle(frame, team_left_roi, cv::Scalar(255,132,255), 2);
+            cv::rectangle(frame, team_right_roi, cv::Scalar(255,132,255), 2);
 
             cv::imshow("debug", frame);
 
