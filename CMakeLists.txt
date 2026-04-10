@@ -13,26 +13,30 @@ find_package(Qt6 COMPONENTS Widgets MultimediaWidgets Multimedia REQUIRED)
 find_package(OpenCV REQUIRED)
 
 include(FetchContent)
+
 FetchContent_Declare(
     Eigen3
-    GIT_REPOSITORY https://gitlab.com/libeigen/eigen
-    GIT_TAG main
+    GIT_REPOSITORY https://gitlab.com/libeigen/eigen.git
+    GIT_TAG master
 )
-FetchContent_Declare(Eigen3)
+FetchContent_MakeAvailable(Eigen3)
 
 FetchContent_Declare(
-    yaml-cpp 
-    GIT_REPOSITORY https://github.com/jbeder/yaml-cpp.git 
-    GIT_TAG main
+    yaml-cpp
+    GIT_REPOSITORY https://github.com/jbeder/yaml-cpp.git
 )
-FetchContent_Declare(yaml-cpp)
+FetchContent_MakeAvailable(yaml-cpp)
 
+set(MOTCPP_INSTALL OFF CACHE BOOL "" FORCE)
 FetchContent_Declare(
     motcpp
-    GIT_REPOSITORY https://github.com/Geekgineer/motcpp.git
+    GIT_REPOSITORY https://github.com/KiingdomKey/motcpp
     GIT_TAG main
 )
 FetchContent_MakeAvailable(motcpp)
+
+target_link_libraries(motcpp PUBLIC yaml-cpp)
+
 
 add_library(onnxruntime SHARED IMPORTED)
 set_target_properties(onnxruntime PROPERTIES
@@ -56,15 +60,15 @@ target_include_directories(Valorant-Vision PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/h
 
 
 # Link Qt + OpenCV
-target_link_libraries(Valorant-Vision
+target_link_libraries(Valorant-Vision PUBLIC
     Qt6::Widgets
     Qt6::Multimedia
     Qt6::MultimediaWidgets
     ${OpenCV_LIBS}
     onnxruntime
-    ${Eigen3_LIBS}
+    Eigen3::Eigen
+    yaml-cpp::yaml-cpp
     motcpp::motcpp
-    ${yaml-cpp_LIBS}
 )
 
 #Copy model weights to the exe folder

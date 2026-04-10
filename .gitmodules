@@ -1,0 +1,9 @@
+[submodule "external/eigen"]
+	path = external/eigen
+	url = https://gitlab.com/libeigen/eigen.git
+[submodule "external/yaml-cpp"]
+	path = external/yaml-cpp
+	url = https://github.com/jbeder/yaml-cpp.git
+[submodule "external/motcpp"]
+	path = external/motcpp
+	url = https://github.com/Geekgineer/motcpp.git
