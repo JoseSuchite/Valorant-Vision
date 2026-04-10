@@ -11,10 +11,7 @@
 #include "Eigen/Dense"
 
 #include <motcpp/trackers/bytetrack.hpp>
-#include <motcpp/trackers/deepocsort.hpp>
-#include <motcpp/trackers/strongsort.hpp>
-#include <motcpp/trackers/oracletrack.hpp>
-#include <motcpp/trackers/boosttrack.hpp>
+
 
 
 //Make sure we use the right type of char, because ONNX on Windows has to be unique and use wchar_t...
@@ -39,10 +36,12 @@ private:
 
 	motcpp::trackers::ByteTrack *tracker = nullptr; //Tracker object
 
-	//Storing an std::string version and a c-style version separaretly
-	//We need c-style to pass into the model but that gets really annoying and yes I know this is ineffecient but like, it's like 4 extra strings
-	//The model has over 40 million parameters
-	//I think we'll live
+	/*Names of the nodes for the model (i.e., the names of the inputs and outputs)
+	Storing an std::string version and a c-style version separaretly
+	We need c-style to pass into the model but that gets really annoying and yes I know this is ineffecient but like, it's like 4 extra strings
+	The model has over 40 million parameters
+	I think we'll live
+	*/
 	std::vector<std::string> inputNodeNames;
 	std::vector<const char *> inputNodeNamesCStyle;
 	std::vector<std::string> outputNodeNames;
