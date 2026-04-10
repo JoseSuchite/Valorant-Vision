@@ -1,9 +1,8 @@
-#include "../headers/neuralnetwork.h"
+#include "neuralnetwork.h"
 
 #include <cstdlib>
 #include <filesystem>
 #include <iostream>
-
 
 #include <onnxruntime_cxx_api.h>
 
@@ -22,7 +21,7 @@ NeuralNetwork::NeuralNetwork(const T_CHAR *onnxFilePath, const int ROWS, const i
         model = new Ort::Session(*env, onnxFilePath, sessionOptions);
     }
     catch (Ort::Exception &e) {
-        throw Ort::Exception("ONNX Runtime error while creating model: " + e.what());
+        throw Ort::Exception(e);
     }
 
     //Get and store input names for the model
@@ -46,15 +45,18 @@ NeuralNetwork::NeuralNetwork(const T_CHAR *onnxFilePath, const int ROWS, const i
     for (auto &name : outputNodeNames) {
         outputNodeNamesCStyle.push_back(name.c_str());
     }
-    //std::string reidWeightsName = "E:/My Program Files/git/repos/Valorant-Vision_old/build/_deps/motcpp-src/scripts/models/osnet_x1_0_dukemtmcreid.onnx";
-
-    tracker = new motcpp::trackers::ByteTrack(false,
-        false,
-        0.4f,
-        30,
-        50,
-        3,
-        0.8f);
+    try {
+        tracker = new motcpp::trackers::ByteTrack(false,
+            false,
+            0.4f,
+            30,
+            50,
+            3,
+            0.8f);
+    }
+    catch (Ort::Exception & e) {
+        throw(e);
+    }
 }
 
 NeuralNetwork::~NeuralNetwork() {
@@ -90,6 +92,7 @@ std::vector<float> NeuralNetwork::prepareImage(const cv::Mat &imageBGR) {
     return imageVector;
 }
 
+//Takes in a cv image, runs a prediction on it, and update internals
 void NeuralNetwork::predict(cv::Mat imageBGR) {
 
     size_t input_tensor_size = 1 * 3 * ROWS * COLS;
@@ -116,7 +119,6 @@ void NeuralNetwork::predict(cv::Mat imageBGR) {
         std::cout << "Inference over" << std::endl;
     }
     catch (const Ort::Exception &e) {
-        std::cerr << "ONNX Runtime error during forward pass: " << e.what() << std::endl;
         throw(e);
     }
 
