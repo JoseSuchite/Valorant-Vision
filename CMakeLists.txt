@@ -1,42 +1,26 @@
-cmake_minimum_required(VERSION 3.16)
-project(Valorant-Vision)
+cmake_minimum_required(VERSION 3.10)
+project(OCR_Detector)
 
 set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_AUTOMOC ON)
-set(CMAKE_AUTORCC ON)
-set(CMAKE_AUTOUIC ON)
-
-
-# Find Qt6
-find_package(Qt6 COMPONENTS Widgets MultimediaWidgets Multimedia REQUIRED)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Find OpenCV
 find_package(OpenCV REQUIRED)
 
-# Your executable
-add_executable(Valorant-Vision
-    "cpp/main.cpp"
-    "cpp/videoplayer.cpp"
-    "headers/videoplayer.h"
-    "headers/mainwindow.h"
-    "cpp/mainwindow.cpp"
-    "cpp/LogBar.cpp"
-    "headers/logbar.h")
+# Find Tesseract
+find_package(Tesseract CONFIG REQUIRED)
 
-
-# Link Qt + OpenCV
-target_link_libraries(Valorant-Vision
-    Qt6::Widgets
-    Qt6::Multimedia
-    Qt6::MultimediaWidgets
-    ${OpenCV_LIBS}
+# Include directories
+include_directories(
+    ${OpenCV_INCLUDE_DIRS}
+    ${Tesseract_INCLUDE_DIRS}
 )
 
-# For adding logo to the app window
-qt_add_resources(APP_RESOURCES resources.qrc)
-target_sources(Valorant-Vision PRIVATE ${APP_RESOURCES})
+# Build executable
+add_executable(ocr_detector main.cpp)
 
-# Optional debug info
-message(STATUS "Qt6_DIR: ${Qt6_DIR}") 
-message(STATUS "OpenCV version: ${OpenCV_VERSION}")
-message(STATUS "OpenCV include dirs: ${OpenCV_INCLUDE_DIRS}")
+# Link libraries
+target_link_libraries(ocr_detector
+    ${OpenCV_LIBS}
+    Tesseract::libtesseract
+)
