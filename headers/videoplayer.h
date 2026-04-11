@@ -7,14 +7,23 @@
 #include <QAudioOutput>
 #include <QVideoWidget>
 #include <QSlider>
+#include <QtGlobal>
+#include <QMetaObject>
+
+#include "modelwrapper.h"
 
 class VideoPlayer : public QWidget {
 
+	Q_OBJECT
+
 private:
+
 	QMediaPlayer *player;
 	QVideoWidget *videoWidget;
 	QAudioOutput *audioOutput;
 	QSlider *slider;
+
+	ModelWrapper modelWrapper;
 
 public:
 	// Takes in a pointer to the parent object
@@ -28,6 +37,12 @@ public:
 
 	//Sets volume for the player
 	void setVolume(float volume);
+
+
+	void onFrameChange(qint64 NthMillisecond);
+
+signals:
+	void frameChanged(Eigen::MatrixXf frameData);
 };
 
 #endif
