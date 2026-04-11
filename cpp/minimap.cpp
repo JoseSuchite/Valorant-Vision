@@ -1,4 +1,8 @@
-#include "../headers/minimap.h"
+#include "minimap.h"
+
+
+//DELETE LATER
+#include <iostream>
 
 Minimap::Minimap(QWidget *parentAddress)
     : QDockWidget("Minimap", parentAddress)
@@ -46,4 +50,7 @@ void Minimap::resizeEvent(QResizeEvent *event)
     }
 
     QDockWidget::resizeEvent(event);
+}
+
+void Minimap::redrawAgents(Eigen::MatrixXf frameData) {
 }
