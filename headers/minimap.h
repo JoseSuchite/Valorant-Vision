@@ -5,6 +5,8 @@
 #include <QLabel>
 #include <QPixmap>
 
+#include <Eigen/dense>
+
 // This class is used by the side bar to show logs and reset bar
 class Minimap : public QDockWidget {
 
@@ -21,6 +23,8 @@ public:
 
 	// allows the image in the widget to resize without losing the quality
 	void resizeEvent(QResizeEvent *event);
+
+	void redrawAgents(Eigen::MatrixXf frameData);
 };
 
 #endif
