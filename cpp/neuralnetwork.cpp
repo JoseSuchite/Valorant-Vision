@@ -47,7 +47,7 @@ NeuralNetwork::NeuralNetwork(const T_CHAR *onnxFilePath, const int ROWS, const i
     }
 
     try {
-        tracker = new motcpp::trackers::DeepOCSort("osnet_x1_0_dukemtmcreid.onnx"); // Set the tracker to the defaults for now
+        tracker = new motcpp::trackers::ByteTrack(); // Set the tracker to the defaults for now
     }
     catch (Ort::Exception & e) {
         throw(e);
@@ -206,7 +206,23 @@ void NeuralNetwork::outputTrackingImageWithBoxesAndLabels(const cv::Mat image, E
 
 void NeuralNetwork::resetTracker(const int FPS) {
     delete tracker;
-    tracker = new motcpp::trackers::DeepOCSort("osnet_x1_0_dukemtmcreid.onnx",
+    
+    tracker = new motcpp::trackers::ByteTrack(0.2f,
+                                            80 * (30.0 / FPS),
+                                            120,
+                                            6,
+                                            0.3f,
+                                            true,
+                                            80, //Number of classes. It's fine to leave for now, but might cause issues if it goes over 80
+                                            "iou",
+                                            false,
+                                            0.05f,
+                                            0.3f,
+                                            0.6f,
+                                            80 * (30.0 / FPS) * 2.0,
+                                            FPS);
+
+    /*tracker = new motcpp::trackers::DeepOCSort("osnet_x1_0_dukemtmcreid.onnx",
                                                 false,
                                                 false,
                                                 0.6f,
@@ -227,20 +243,5 @@ void NeuralNetwork::resetTracker(const int FPS) {
                                                 false,
                                                 false,
                                                 0.8f,
-                                                0.1f);
-
-    //tracker = new motcpp::trackers::ByteTrack(0.2f,
-    //                                        80 * (30.0 / FPS),
-    //                                        120,
-    //                                        6,
-    //                                        0.3f,
-    //                                        true,
-    //                                        80, //Number of classes. It's fine to leave for now, but might cause issues if it goes over 80
-    //                                        "iou",
-    //                                        false,
-    //                                        0.05f,
-    //                                        0.3f,
-    //                                        0.6f,
-    //                                        80 * (30.0 / FPS) * 2.0,
-    //                                        FPS);
+                                                0.1f);*/
 }
