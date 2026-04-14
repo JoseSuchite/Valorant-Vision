@@ -32,7 +32,7 @@ Minimap::Minimap(QWidget *parentAddress)
     for (int i = 0; i < numClasses; i++) {
         idToName.push_back(idToNameJSON["categories"][i]["name"]);
     }
-
+    agentIcons.push_back(cv::Mat());
     for (int i = 0; i < numClasses; i++) {
         cv::Mat img = cv::imread("agent_icons/" + idToName[i] + ".png", cv::IMREAD_UNCHANGED);
         cv::Mat resizedImg;
