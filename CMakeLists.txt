@@ -111,6 +111,32 @@ add_custom_command(
             "${CMAKE_SOURCE_DIR}/map_layouts"
             "$<TARGET_FILE_DIR:${PROJECT_NAME}>/map_layouts"
 )
+
+# Adds the agent icons folder to the .exe directory
+add_custom_command(
+    TARGET ${PROJECT_NAME} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${CMAKE_SOURCE_DIR}/model/agent_icons"
+            "$<TARGET_FILE_DIR:${PROJECT_NAME}>/agent_icons"
+)
+
+# Adds id to agent icon file to .exe directory
+add_custom_command(
+    TARGET ${PROJECT_NAME} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${CMAKE_SOURCE_DIR}/model/id_to_name.json"
+            "$<TARGET_FILE_DIR:${PROJECT_NAME}>"
+)
+
+# Adds the REID weights to the .exe directory
+add_custom_command(
+    TARGET ${PROJECT_NAME} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${CMAKE_SOURCE_DIR}/model/osnet_x1_0_dukemtmcreid.onnx"
+            "$<TARGET_FILE_DIR:${PROJECT_NAME}>"
+)
+
+
 # For adding logo to the app window
 qt_add_resources(APP_RESOURCES resources.qrc)
 target_sources(Valorant-Vision PRIVATE ${APP_RESOURCES})
