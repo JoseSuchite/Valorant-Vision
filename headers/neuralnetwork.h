@@ -35,7 +35,7 @@ private:
 	int ROWS; //Height of images to use
 	int COLS; //Width of images to use
 
-	motcpp::trackers::DeepOCSort *tracker = nullptr; //Tracker object
+	motcpp::trackers::ByteTrack *tracker = nullptr; //Tracker object
 
 	/*Names of the nodes for the model (i.e., the names of the inputs and outputs)
 	Storing an std::string version and a c-style version separaretly
