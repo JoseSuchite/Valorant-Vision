@@ -45,14 +45,9 @@ NeuralNetwork::NeuralNetwork(const T_CHAR *onnxFilePath, const int ROWS, const i
     for (auto &name : outputNodeNames) {
         outputNodeNamesCStyle.push_back(name.c_str());
     }
+
     try {
-        tracker = new motcpp::trackers::ByteTrack(false,
-            false,
-            0.4f,
-            30,
-            50,
-            3,
-            0.8f);
+        tracker = new motcpp::trackers::DeepOCSort("osnet_x1_0_dukemtmcreid.onnx"); // Set the tracker to the defaults for now
     }
     catch (Ort::Exception & e) {
         throw(e);
@@ -109,14 +104,12 @@ void NeuralNetwork::predict(cv::Mat imageBGR) {
     std::vector<Ort::Value> outputTensor;
 
     try {
-        std::cout << "Starting inference" << std::endl;
         outputTensor = model->Run(Ort::RunOptions{ nullptr },
             inputNodeNamesCStyle.data(),
             &input_tensor,
             inputNodeNamesCStyle.size(),
             outputNodeNamesCStyle.data(),
             outputNodeNamesCStyle.size());
-        std::cout << "Inference over" << std::endl;
     }
     catch (const Ort::Exception &e) {
         throw(e);
@@ -146,7 +139,18 @@ void NeuralNetwork::predict(cv::Mat imageBGR) {
         currentPrediction(i, 5) = labelsArr[i];
     }
 
-    currentTracking = tracker->update(currentPrediction, imageBGR);
+    //motcpp doesn't properly check for empty predictions
+    //this likely messes with the tracking, but realistically there should almost always be SOME prediction
+    if (currentPrediction.rows() > 0) {
+        cv::Mat resizedImg;
+        cv::resize(imageBGR, resizedImg, cv::Size(COLS, ROWS));
+        try {
+            currentTracking = tracker->update(currentPrediction, resizedImg);
+        }
+        catch (...) {
+            std::cerr << "Tracker failed. Using previous frame data" << std::endl;
+        }
+    }
 }
 
 
@@ -198,4 +202,45 @@ void NeuralNetwork::outputTrackingImageWithBoxesAndLabels(const cv::Mat image, E
 
     }
     cv::imwrite(outFileName, resizedImg);
+}
+
+void NeuralNetwork::resetTracker(const int FPS) {
+    delete tracker;
+    tracker = new motcpp::trackers::DeepOCSort("osnet_x1_0_dukemtmcreid.onnx",
+                                                false,
+                                                false,
+                                                0.6f,
+                                                30,
+                                                50,
+                                                3,
+                                                0.2f,
+                                                true,
+                                                80,
+                                                "iou",
+                                                false,
+                                                4,
+                                                0.2f,
+                                                0.1f,
+                                                0.9f,
+                                                0.5f,
+                                                false,
+                                                false,
+                                                false,
+                                                0.8f,
+                                                0.1f);
+
+    //tracker = new motcpp::trackers::ByteTrack(0.2f,
+    //                                        80 * (30.0 / FPS),
+    //                                        120,
+    //                                        6,
+    //                                        0.3f,
+    //                                        true,
+    //                                        80, //Number of classes. It's fine to leave for now, but might cause issues if it goes over 80
+    //                                        "iou",
+    //                                        false,
+    //                                        0.05f,
+    //                                        0.3f,
+    //                                        0.6f,
+    //                                        80 * (30.0 / FPS) * 2.0,
+    //                                        FPS);
 }

@@ -2,8 +2,8 @@
 #define NEURALNETWORK_H
 
 #include <filesystem>
-#include <unordered_map>
 #include <string>
+
 
 #include <onnxruntime_cxx_api.h>
 #include <opencv2/opencv.hpp>
@@ -11,7 +11,8 @@
 #include "Eigen/Dense"
 
 #include <motcpp/trackers/bytetrack.hpp>
-
+#include <motcpp/trackers/strongsort.hpp>
+#include <motcpp/trackers/deepocsort.hpp>
 
 
 //Make sure we use the right type of char, because ONNX on Windows has to be unique and use wchar_t...
@@ -34,7 +35,7 @@ private:
 	int ROWS; //Height of images to use
 	int COLS; //Width of images to use
 
-	motcpp::trackers::ByteTrack *tracker = nullptr; //Tracker object
+	motcpp::trackers::DeepOCSort *tracker = nullptr; //Tracker object
 
 	/*Names of the nodes for the model (i.e., the names of the inputs and outputs)
 	Storing an std::string version and a c-style version separaretly
@@ -55,6 +56,7 @@ private:
 	std::vector<float> prepareImage(const cv::Mat &);
 
 
+
 public:
 
 	NeuralNetwork(const T_CHAR *onnxFilePath, const int ROWS, const int COLS);
@@ -71,6 +73,8 @@ public:
 
 	//Outputs an image file with tracking information drawn on it. Takes in the image, eigen matrix of tracking information, and the name of the file to be created
 	void outputTrackingImageWithBoxesAndLabels(const cv::Mat image, Eigen::MatrixXf, std::string outFileName);
+
+	void resetTracker(const int FPS);
 };
 
 #endif
