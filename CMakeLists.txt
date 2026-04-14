@@ -13,7 +13,7 @@ find_package(OpenCV REQUIRED)
 
 include(FetchContent)
 
-# Download eigen (I love this library
+# Download eigen (I love this library)
 FetchContent_Declare(
     Eigen3
     GIT_REPOSITORY https://gitlab.com/libeigen/eigen.git
@@ -39,6 +39,13 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(motcpp)
 
+set(JSON_INSTALL OFF CACHE BOOL "" FORCE)
+FetchContent_Declare(
+    nlohmann_json
+    GIT_REPOSITORY https://github.com/nlohmann/json
+)
+FetchContent_MakeAvailable(nlohmann_json)
+
 target_link_libraries(motcpp PUBLIC yaml-cpp)
 
 add_library(onnxruntime SHARED IMPORTED)
@@ -61,7 +68,7 @@ add_executable(Valorant-Vision
     # Why are only these two .h files here when the directories are included down below, you ask?
     # Why, that's actually quite simple! It's because Qt is weird and breaks without it
     # (The real answer is that it involves generation of MOC files or something, and it can't find the .h files by just including the directories
-    # Only comes up for these two since they're being connected through Qt connect
+    # Only comes up for these two since they're being connected through Qt connect which requires stuff with MOC files
     "headers/videoplayer.h" 
     "headers/minimap.h"
 )
@@ -80,6 +87,7 @@ target_link_libraries(Valorant-Vision PUBLIC
     Eigen3::Eigen
     yaml-cpp::yaml-cpp
     motcpp::motcpp
+    nlohmann_json::nlohmann_json
 )
 
 #Copy model weights to the exe folder
