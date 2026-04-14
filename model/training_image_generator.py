@@ -26,7 +26,7 @@ class ImageGenerator:
         self.agent_icon_path = agent_icon_path
         self.map_layout_path = minimap_path
         self.map_resize_factor = map_resize_factor
-        self.agent_resize_factor = (int(map_resize_factor[0] * 0.09), int(map_resize_factor[1] * 0.09)) 
+        self.agent_resize_factor = (int(map_resize_factor[0] * 0.10), int(map_resize_factor[1] * 0.10)) 
         self.misc_icon_path = misc_icon_path
 
         self.agent_icons = []
@@ -66,7 +66,7 @@ class ImageGenerator:
         load_results(self.map_layout_path, self.map_layouts, resize_factor=self.map_resize_factor)
         load_results(self.misc_icon_path, self.misc_icons)
 
-        self.class_ids = {name: i for i, (_, name) in enumerate(self.agent_icons)}
+        self.class_ids = {name: i + 1 for i, (_, name) in enumerate(self.agent_icons)}
 
         self.coco_data = {
             "images": [],
@@ -94,8 +94,9 @@ class ImageGenerator:
 
             agent_icon, agent_name = random.choice(self.agent_icons)
             agent_icon, inner_r, crop_pad = self.square_to_circle_with_border(image=agent_icon)
-            agent_icon = self.rotate_image_randomly(agent_icon, angle_range=(-20, 20))
-            #agent_icon = self.skew_image(agent_icon, skew_angle_deg_x=random.randint(-10, 10), skew_angle_deg_y=random.randint(-10, 10))
+            agent_icon = self.rotate_image_randomly(agent_icon, angle_range=(-5, 5))
+            agent_icon = self.skew_image(agent_icon, skew_angle_deg_x=random.randint(-5, 5), skew_angle_deg_y=random.randint(-5, 5))
+            agent_icon = self.zero_out_random_quarter(agent_icon) if random.random() < 0.4 else agent_icon # We cut out a random quarter of the image to simulate it being covered up. Feel free to reduce if it's too extreme
 
             # Get dimensions of the minimap and agent icon
             minimap_height, minimap_width, _ = minimap.shape
@@ -452,6 +453,22 @@ class ImageGenerator:
         image[mask] = 0
         return image
 
+    def zero_out_random_quarter(self, image):
+
+        h, w, c = image.shape
+        num = random.randint(1, 4)
+
+        if num == 1:
+            image[0:h//2, 0:w//2] = 0
+        elif num == 2:
+            image[0:h//2, w//2:w] = 0
+        elif num == 3:
+            image[h//2:h, 0:w//2] = 0
+        elif num == 4:
+            image[h//2:h, w//2:w] = 0
+        
+        return image
+
     # Takes in an image and a list of positions (as well as the file name) and creates the image file and saves the position data to later make the COCO file
     def output_image(self, image, positions, file_name, is_train=True):
 
@@ -527,13 +544,15 @@ class ImageGenerator:
         minimap = self.generate_map()
 
         minimap = self.draw_misc(minimap, num_misc_to_draw=random.randint(10, 16))
-        minimap, positions = self.draw_agents(minimap, num_agents_to_draw=random.randint(8, 20))
+        minimap, positions = self.draw_agents(minimap, num_agents_to_draw=random.randint(16, 40))
         minimap = self.add_gaussian_noise(minimap, sigma_range=(0.0, 0.01))
-        minimap = self.scale_artifact(minimap, scale_range=(0.5, 1.0))
-        minimap = self.apply_jpeg_compression(minimap, quality_range=(20, 100))
+        minimap = self.scale_artifact(minimap, scale_range=(0.8, 1.0))
+        minimap = self.apply_jpeg_compression(minimap, quality_range=(80, 100))
 
-        #minimap = self.make_random_invisible(minimap, percent_invisible=0.05)
-        #minimap = cv2.GaussianBlur(minimap, (3, 3) if random.random() < 0.5 else (5, 5), 3)
+        #minimap = self.make_random_invisible(minimap, percent_invisible=0.01)
+        #minimap = cv2.GaussianBlur(minimap, (3, 3), 0) if random.random() < 0.5 else minimap
+
+        # The next two could be helpful, but you'd need to recalculate the bounding boxes and I don't want to
         #minimap = self.skew_image(minimap, skew_angle_deg_x=random.randint(-10, 10), skew_angle_deg_y=random.randint(-10, 10))
         #minimap = self.rotate_image_randomly(minimap, angle_range=(-10, 10))
 
