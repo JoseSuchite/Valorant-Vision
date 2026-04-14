@@ -25,6 +25,8 @@ private:
 
 	ModelWrapper modelWrapper;
 
+	double currentVideoFPS = 0;
+
 public:
 	// Takes in a pointer to the parent object
 	VideoPlayer(QWidget *parent);
