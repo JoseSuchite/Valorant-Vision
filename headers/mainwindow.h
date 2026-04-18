@@ -9,8 +9,11 @@
 #include "../headers/logbar.h"
 #include "../headers/videoplayer.h"
 #include "../headers/minimap.h"
-// This class acts as the main window for the application and acts like a normal QWidget
+#include "../headers/ocr.h"
+
 class MainWindow : public QMainWindow {
+    Q_OBJECT
+
 private:
     QWidget* centralWidget;
     QVBoxLayout* mainVerticalLayout;
@@ -24,12 +27,16 @@ private:
     QSlider* volumeSlider;
     QPixmap* pixmap;
     QLabel* picLabel;
-    //Prompts user to select a file from the file browser and then calls the video player to play it
+    OCRDetector* ocrDetector;
+
     void openAndPlayVideoOnClick();
-    //Pauses or plays the video (depends on the state)
     void pauseOrPlayVideo();
-    //Resets the side bar to its original place
     void resetBar();
+
+private slots:
+    void onTeamsDetected(QString left, QString right);
+    void onScoresChanged(QString leftTeam, int leftScore, QString rightTeam, int rightScore);
+
 public:
     MainWindow();
 };

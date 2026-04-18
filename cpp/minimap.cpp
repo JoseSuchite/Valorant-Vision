@@ -25,6 +25,11 @@ Minimap::Minimap(QWidget *parentAddress)
     setWidget(minimap_wid);
 
     std::ifstream f("id_to_name.json");
+    // was crashing when it couldn't find the file, so added this check and warning message
+    if (!f.is_open()) {
+        qWarning("Minimap: could not open id_to_name.json — check working directory");
+        return;
+    }
     nlohmann::json idToNameJSON = nlohmann::json::parse(f);
     f.close();
 
@@ -35,8 +40,13 @@ Minimap::Minimap(QWidget *parentAddress)
     agentIcons.push_back(cv::Mat());
     for (int i = 0; i < numClasses; i++) {
         cv::Mat img = cv::imread("agent_icons/" + idToName[i] + ".png", cv::IMREAD_UNCHANGED);
+        if (img.empty()) {
+            qWarning("Minimap: could not load agent icon for '%s'", idToName[i].c_str());
+            agentIcons.push_back(cv::Mat());
+            continue;
+        }
         cv::Mat resizedImg;
-        cv::resize(img, resizedImg, cv::Size(20, 20)); //This isn't *really* hardcoding, as this will get layered onto the image when it's resized to match the model's predictions
+        cv::resize(img, resizedImg, cv::Size(20, 20));
         agentIcons.push_back(resizedImg);
     }
 }
