@@ -1,11 +1,8 @@
 #include "modelwrapper.h"
 
 ModelWrapper::ModelWrapper() {
-
-	const int ROWS = 384;
-	const int COLS = 384;
-	model = new NeuralNetwork(T_TEXT("faster_rcnn.onnx"), ROWS, COLS);
-
+	// Model is loaded in startProcessingLoop to avoid crashing on startup
+	// if the working directory is not set correctly.
 }
 
 ModelWrapper::~ModelWrapper() {
@@ -75,6 +72,23 @@ void ModelWrapper::endProcessingLoop() {
 void ModelWrapper::startProcessingLoop(const std::string fileName, const int RUN_EVERY_N_FRAMES, const int FPS) {
 
 	EVERY_N_FRAMES = RUN_EVERY_N_FRAMES;
+
+	if (model == nullptr) {
+		const int ROWS = 384;
+		const int COLS = 384;
+		try {
+			model = new NeuralNetwork(T_TEXT("faster_rcnn.onnx"), ROWS, COLS);
+		}
+		catch (const Ort::Exception& e) {
+			std::cerr << "[ModelWrapper] Failed to load ONNX model: " << e.what() << std::endl;
+			return;
+		}
+		catch (const std::exception& e) {
+			std::cerr << "[ModelWrapper] Failed to load ONNX model: " << e.what() << std::endl;
+			return;
+		}
+	}
+
 	model->resetTracker(FPS / RUN_EVERY_N_FRAMES);
 	keepThreadAlive = true;
 

@@ -34,6 +34,19 @@ VideoPlayer::VideoPlayer(QWidget *parentAddress) :
 	layout->addWidget(slider);
 
 	connect(player, &QMediaPlayer::positionChanged, this, &VideoPlayer::onFrameChange);
+
+	connect(player, &QMediaPlayer::playbackStateChanged, this,
+		[this](QMediaPlayer::PlaybackState state) {
+			if (state == QMediaPlayer::PlayingState)
+				emit videoPlaying(player->position());
+			else if (state == QMediaPlayer::PausedState)
+				emit videoPaused();
+		});
+}
+
+qint64 VideoPlayer::currentPositionMs() const
+{
+	return player->position();
 }
 
 //Takes in the url to a video and displays it
@@ -74,6 +87,7 @@ void VideoPlayer::setVolume(float volume) {
 }
 
 void VideoPlayer::onFrameChange(qint64 NthMillisecond) {
+	emit videoPositionChanged(NthMillisecond);
 
 	//Get frame rate of the video to convert milliseconds to frames
 	qint64 frameNum = (NthMillisecond / 1000.0) * currentVideoFPS;

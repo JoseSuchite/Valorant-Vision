@@ -39,6 +39,30 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(motcpp)
 
+# Tesseract, Leptonica, and libcurl from Desktop vcpkg
+set(VCPKG_DIR "C:/Users/Kisu/Desktop/vcpkg/installed/x64-windows")
+
+add_library(tesseract SHARED IMPORTED)
+set_target_properties(tesseract PROPERTIES
+    IMPORTED_IMPLIB "${VCPKG_DIR}/lib/tesseract55.lib"
+    IMPORTED_LOCATION "${VCPKG_DIR}/bin/tesseract55.dll"
+    INTERFACE_INCLUDE_DIRECTORIES "${VCPKG_DIR}/include"
+)
+
+add_library(leptonica SHARED IMPORTED)
+set_target_properties(leptonica PROPERTIES
+    IMPORTED_IMPLIB "${VCPKG_DIR}/lib/leptonica-1.87.0.lib"
+    IMPORTED_LOCATION "${VCPKG_DIR}/bin/leptonica-1.87.0.dll"
+    INTERFACE_INCLUDE_DIRECTORIES "${VCPKG_DIR}/include"
+)
+
+add_library(libcurl SHARED IMPORTED)
+set_target_properties(libcurl PROPERTIES
+    IMPORTED_IMPLIB "${VCPKG_DIR}/lib/libcurl.lib"
+    IMPORTED_LOCATION "${VCPKG_DIR}/bin/libcurl.dll"
+    INTERFACE_INCLUDE_DIRECTORIES "${VCPKG_DIR}/include"
+)
+
 set(JSON_INSTALL OFF CACHE BOOL "" FORCE)
 FetchContent_Declare(
     nlohmann_json
@@ -48,11 +72,17 @@ FetchContent_MakeAvailable(nlohmann_json)
 
 target_link_libraries(motcpp PUBLIC yaml-cpp)
 
+if(NOT DEFINED ENV{ONNXRuntime_DIR} OR "$ENV{ONNXRuntime_DIR}" STREQUAL "")
+    set(ONNXRUNTIME_DIR "C:/libs/onnxruntime")
+else()
+    set(ONNXRUNTIME_DIR "$ENV{ONNXRuntime_DIR}")
+endif()
+
 add_library(onnxruntime SHARED IMPORTED)
 set_target_properties(onnxruntime PROPERTIES
-    IMPORTED_IMPLIB "$ENV{ONNXRuntime_DIR}/lib/onnxruntime.lib"
-    IMPORTED_LOCATION "$ENV{ONNXRuntime_DIR}/lib/onnxruntime.dll"
-    INTERFACE_INCLUDE_DIRECTORIES "$ENV{ONNXRuntime_DIR}/include"
+    IMPORTED_IMPLIB "${ONNXRUNTIME_DIR}/lib/onnxruntime.lib"
+    IMPORTED_LOCATION "${ONNXRUNTIME_DIR}/lib/onnxruntime.dll"
+    INTERFACE_INCLUDE_DIRECTORIES "${ONNXRUNTIME_DIR}/include"
 )
 
 # Your executable
@@ -65,12 +95,12 @@ add_executable(Valorant-Vision
     "cpp/neuralnetwork.cpp"
     "cpp/Mapdetector.cpp"
     "cpp/modelwrapper.cpp"
-    # Why are only these two .h files here when the directories are included down below, you ask?
-    # Why, that's actually quite simple! It's because Qt is weird and breaks without it
-    # (The real answer is that it involves generation of MOC files or something, and it can't find the .h files by just including the directories
-    # Only comes up for these two since they're being connected through Qt connect which requires stuff with MOC files
-    "headers/videoplayer.h" 
+    "cpp/ocr.cpp"
+    "cpp/webScraper.cpp"
+    "headers/videoplayer.h"
     "headers/minimap.h"
+    "headers/mainwindow.h"
+    "headers/ocr.h"
 )
 
 # Lets us just include the files without having to specify relative path
@@ -88,6 +118,9 @@ target_link_libraries(Valorant-Vision PUBLIC
     yaml-cpp::yaml-cpp
     motcpp::motcpp
     nlohmann_json::nlohmann_json
+    tesseract
+    leptonica
+    libcurl
 )
 
 #Copy model weights to the exe folder
@@ -118,6 +151,25 @@ add_custom_command(
     COMMAND ${CMAKE_COMMAND} -E copy_directory
             "${CMAKE_SOURCE_DIR}/model/agent_icons"
             "$<TARGET_FILE_DIR:${PROJECT_NAME}>/agent_icons"
+)
+
+# Copy tesseract/leptonica/curl DLLs
+foreach(DLL
+    "${VCPKG_DIR}/bin/tesseract55.dll"
+    "${VCPKG_DIR}/bin/leptonica-1.87.0.dll"
+    "${VCPKG_DIR}/bin/libcurl.dll"
+)
+    add_custom_command(TARGET Valorant-Vision POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${DLL}" "$<TARGET_FILE_DIR:Valorant-Vision>"
+    )
+endforeach()
+
+# Copy tessdata folder next to the exe
+add_custom_command(TARGET Valorant-Vision POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+    "${CMAKE_SOURCE_DIR}/tessdata"
+    "$<TARGET_FILE_DIR:Valorant-Vision>/tessdata"
 )
 
 # Adds id to agent icon file to .exe directory

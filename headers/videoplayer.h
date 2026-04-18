@@ -43,8 +43,13 @@ public:
 
 	void onFrameChange(qint64 NthMillisecond);
 
+	qint64 currentPositionMs() const;
+
 signals:
 	void frameChanged(Eigen::MatrixXf frameData);
+	void videoPlaying(qint64 positionMs);
+	void videoPaused();
+	void videoPositionChanged(qint64 positionMs);
 };
 
 #endif
