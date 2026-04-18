@@ -64,7 +64,17 @@ QString detectMapFromVideo(const std::string& videoPath) {
 
         // Run Tesseract
         QProcess process;
-        process.start("tesseract", {
+        QString tesseractExe = "tesseract";
+        if (!QFile::exists("tesseract")) {
+            // Common install locations on Windows
+            for (const QString& path : {
+                "C:/Program Files/Tesseract-OCR/tesseract.exe",
+                "C:/Program Files (x86)/Tesseract-OCR/tesseract.exe"
+            }) {
+                if (QFile::exists(path)) { tesseractExe = path; break; }
+            }
+        }
+        process.start(tesseractExe, {
             tempImage, tempText,
             "--psm", "7",
             "-c", "tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ: "
