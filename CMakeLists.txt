@@ -40,7 +40,7 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(motcpp)
 
 # Tesseract, Leptonica, and libcurl from Desktop vcpkg
-set(VCPKG_DIR "C:/Users/Kisu/Desktop/vcpkg/installed/x64-windows")
+set(VCPKG_DIR "$ENV{VCPKG_DIR}")
 
 add_library(tesseract SHARED IMPORTED)
 set_target_properties(tesseract PROPERTIES
@@ -97,19 +97,10 @@ add_executable(Valorant-Vision
     "cpp/modelwrapper.cpp"
     "cpp/ocr.cpp"
     "cpp/webScraper.cpp"
-<<<<<<< HEAD
-    # Why are only these two .h files here when the directories are included down below, you ask?
-    # Why, that's actually quite simple! It's because Qt is weird and breaks without it
-    # (The real answer is that it involves generation of MOC files or something, and it can't find the .h files by just including the directories
-    # Only comes up for these two since they're being connected through Qt connect which requires stuff with MOC files
-    "headers/videoplayer.h"
-    "headers/minimap.h"
-=======
     "headers/videoplayer.h"
     "headers/minimap.h"
     "headers/mainwindow.h"
     "headers/ocr.h"
->>>>>>> 9a4bdb20a0f49958b16e022deb754a6b7435a051
 )
 
 # Lets us just include the files without having to specify relative path
@@ -167,6 +158,12 @@ foreach(DLL
     "${VCPKG_DIR}/bin/tesseract55.dll"
     "${VCPKG_DIR}/bin/leptonica-1.87.0.dll"
     "${VCPKG_DIR}/bin/libcurl.dll"
+    "${VCPKG_DIR}/bin/archive.dll"
+    "${VCPKG_DIR}/bin/gif.dll"
+    "${VCPKG_DIR}/bin/openjp2.dll"
+    "${VCPKG_DIR}/bin/libwebpmux.dll"
+    "${VCPKG_DIR}/bin/lz4.dll"
+    "${VCPKG_DIR}/bin/zstd.dll"
 )
     add_custom_command(TARGET Valorant-Vision POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
