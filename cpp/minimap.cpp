@@ -27,7 +27,11 @@ Minimap::Minimap(QWidget *parentAddress)
     std::ifstream f("id_to_name.json");
     // was crashing when it couldn't find the file, so added this check and warning message
     if (!f.is_open()) {
+<<<<<<< HEAD
         qWarning("Minimap: could not open id_to_name.json — check working directory");
+=======
+        qWarning("Minimap: could not open id_to_name.json â€” check working directory");
+>>>>>>> 9a4bdb20a0f49958b16e022deb754a6b7435a051
         return;
     }
     nlohmann::json idToNameJSON = nlohmann::json::parse(f);
@@ -46,7 +50,11 @@ Minimap::Minimap(QWidget *parentAddress)
             continue;
         }
         cv::Mat resizedImg;
+<<<<<<< HEAD
         cv::resize(img, resizedImg, cv::Size(20, 20)); //This isn't *really* hardcoding, as this will get layered onto the image when it's resized to match the model's predictions
+=======
+        cv::resize(img, resizedImg, cv::Size(20, 20));
+>>>>>>> 9a4bdb20a0f49958b16e022deb754a6b7435a051
         agentIcons.push_back(resizedImg);
     }
 }

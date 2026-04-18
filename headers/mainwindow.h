@@ -30,9 +30,13 @@ private:
     OCRDetector* ocrDetector;
 
     void openAndPlayVideoOnClick();
+<<<<<<< HEAD
     //Pauses or plays the video (depends on the state)
     void pauseOrPlayVideo();
     //Resets the side bar to its original place
+=======
+    void pauseOrPlayVideo();
+>>>>>>> 9a4bdb20a0f49958b16e022deb754a6b7435a051
     void resetBar();
 
 private slots:

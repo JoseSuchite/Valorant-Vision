@@ -97,12 +97,19 @@ add_executable(Valorant-Vision
     "cpp/modelwrapper.cpp"
     "cpp/ocr.cpp"
     "cpp/webScraper.cpp"
+<<<<<<< HEAD
     # Why are only these two .h files here when the directories are included down below, you ask?
     # Why, that's actually quite simple! It's because Qt is weird and breaks without it
     # (The real answer is that it involves generation of MOC files or something, and it can't find the .h files by just including the directories
     # Only comes up for these two since they're being connected through Qt connect which requires stuff with MOC files
     "headers/videoplayer.h"
     "headers/minimap.h"
+=======
+    "headers/videoplayer.h"
+    "headers/minimap.h"
+    "headers/mainwindow.h"
+    "headers/ocr.h"
+>>>>>>> 9a4bdb20a0f49958b16e022deb754a6b7435a051
 )
 
 # Lets us just include the files without having to specify relative path
