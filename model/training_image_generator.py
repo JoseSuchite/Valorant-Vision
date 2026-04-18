@@ -26,7 +26,7 @@ class ImageGenerator:
         self.agent_icon_path = agent_icon_path
         self.map_layout_path = minimap_path
         self.map_resize_factor = map_resize_factor
-        self.agent_resize_factor = (int(map_resize_factor[0] * 0.10), int(map_resize_factor[1] * 0.10)) 
+        self.agent_resize_factor = (int(map_resize_factor[0] * 0.04), int(map_resize_factor[1] * 0.04)) 
         self.misc_icon_path = misc_icon_path
 
         self.agent_icons = []
@@ -51,18 +51,20 @@ class ImageGenerator:
                 else:
                     raise ValueError(f"Unsupported image format: {extension}")
 
-        def load_results(folder_path, array, resize_factor=None):
+        def load_results(folder_path, array, resize_factor=None, crop_sides=False):
             for path in os.listdir(folder_path):
                 path = os.path.join(folder_path, path)
                 result = load_image(path)
                 if result:
                     img, label = result
                     img = img.transpose(1, 2, 0) # Puts everything in HWC format for cv2
+                    if crop_sides:
+                        img = self.remove_transparent_pixels(img)
                     if resize_factor is not None:
                         img = cv2.resize(img, resize_factor)
                     array.append((img, label))
 
-        load_results(self.agent_icon_path, self.agent_icons, resize_factor=self.agent_resize_factor)
+        load_results(self.agent_icon_path, self.agent_icons, resize_factor=self.agent_resize_factor, crop_sides=True)
         load_results(self.map_layout_path, self.map_layouts, resize_factor=self.map_resize_factor)
         load_results(self.misc_icon_path, self.misc_icons)
 
@@ -93,9 +95,13 @@ class ImageGenerator:
         for _ in range(num_agents_to_draw):
 
             agent_icon, agent_name = random.choice(self.agent_icons)
-            agent_icon, inner_r, crop_pad = self.square_to_circle_with_border(image=agent_icon)
+            agent_icon = agent_icon.copy()
+
+            #agent_icon, inner_r, crop_pad = self.square_to_circle_with_border(image=agent_icon)
+
             agent_icon = self.rotate_image_randomly(agent_icon, angle_range=(-5, 5))
             agent_icon = self.skew_image(agent_icon, skew_angle_deg_x=random.randint(-5, 5), skew_angle_deg_y=random.randint(-5, 5))
+            agent_icon = self.random_color_offset(agent_icon)
             agent_icon = self.zero_out_random_quarter(agent_icon) if random.random() < 0.4 else agent_icon # We cut out a random quarter of the image to simulate it being covered up. Feel free to reduce if it's too extreme
 
             # Get dimensions of the minimap and agent icon
@@ -126,30 +132,16 @@ class ImageGenerator:
             scaling_factor = random.uniform(0.9, 1.1)
             resize_factor = (int(self.agent_resize_factor[0] * scaling_factor), int(self.agent_resize_factor[1] * scaling_factor))
 
-            result = self.overlay_transparent(minimap, agent_icon, x, y, resize_factor)
-            if result is not None:
-                minimap = result
+            minimap = self.overlay_transparent(minimap, agent_icon, x, y, resize_factor)
 
-                # resize icon exactly the same way it was drawn (please change this later PLEASE)
-                scaled_icon = cv2.resize(agent_icon, resize_factor)
-
-                # Scale inner_r and crop_pad to match the resized icon
-                scale = resize_factor[0] / agent_icon.shape[0]
-                scaled_inner_r = int(inner_r * scale)
-                scaled_crop_pad = int(crop_pad * scale)
-
-                # Center of the icon in minimap coordinates
-                icon_cx = x + scaled_crop_pad + (resize_factor[1] // 2 - scaled_crop_pad)
-                icon_cy = y + scaled_crop_pad + (resize_factor[0] // 2 - scaled_crop_pad)
-
-              
-                position_data.append({
-                    "name": agent_name,
-                    #"coordinates": (x + xmin, y + ymin),
-                    "coordinates": (icon_cx - scaled_inner_r, icon_cy - scaled_inner_r),
-                    "height": scaled_inner_r * 2,
-                    "width": scaled_inner_r * 2
-                })
+            # Keep track of where we just put the agent
+            position_data.append({
+                "name": agent_name,
+                "coordinates": (x, y),
+        
+                "height": resize_factor[0],
+                "width": resize_factor[1]
+            })
 
         return minimap, position_data
 
@@ -193,20 +185,8 @@ class ImageGenerator:
 
         return minimap
 
-    def create_circular_mask(h, w):
-
-        center = (int(w/2), int(h/2))
-        
-        radius = min(center[0], center[1], w-center[0], h-center[1])
-
-        Y, X = np.ogrid[:h, :w]
-        dist_from_center = np.sqrt((X - center[0])**2 + (Y-center[1])**2)
-
-        mask = dist_from_center <= radius
-
-        return mask, center, radius
-
     # Takes in a numpy array (image) and returns a circular version as a numpy array
+    # Note: this function currently isn't used anymore, but I'm keeping it here so anyone can see how to draw the arrows if that's ever needed
     def square_to_circle_with_border(self, image: np.ndarray, border_color=None,
                                       direction_angle: float = None) -> np.ndarray:  # noqa: keep sig
         """
@@ -228,11 +208,11 @@ class ImageGenerator:
             border_color = (183/255, 32/255, 48/255, 1.0) if random.random() < 0.5 \
                            else (125/255, 211/255, 188/255, 1.0)
 
-        # Apply a little randomness to the border color
-        COLOR_DEVIATION_FACTOR = 0.5 # [REMOVE] later, this is just to have it focus on detecting the portrait rather than relying on the border color
-        border_color = (random.uniform(-COLOR_DEVIATION_FACTOR, COLOR_DEVIATION_FACTOR) + border_color[0], 
-                        random.uniform(-COLOR_DEVIATION_FACTOR, COLOR_DEVIATION_FACTOR) + border_color[1], 
-                        random.uniform(-COLOR_DEVIATION_FACTOR, COLOR_DEVIATION_FACTOR) + border_color[2], 1)
+            # Apply a little randomness to the border color
+            COLOR_DEVIATION_FACTOR = 0.5 # [REMOVE] later, this is just to have it focus on detecting the portrait rather than relying on the border color
+            border_color = (random.uniform(-COLOR_DEVIATION_FACTOR, COLOR_DEVIATION_FACTOR) + border_color[0], 
+                            random.uniform(-COLOR_DEVIATION_FACTOR, COLOR_DEVIATION_FACTOR) + border_color[1], 
+                            random.uniform(-COLOR_DEVIATION_FACTOR, COLOR_DEVIATION_FACTOR) + border_color[2], 1)
 
         border_color = np.clip(border_color, 0, 1)
 
@@ -330,7 +310,6 @@ class ImageGenerator:
 
         overlay = cv2.cvtColor(overlay, cv2.COLOR_RGBA2BGRA) # Convert RGBA to BGRA
         overlay = cv2.resize(overlay, overlay_size) if overlay_size is not None else overlay
-
         background_width = background.shape[1]
         background_height = background.shape[0]
 
@@ -382,7 +361,7 @@ class ImageGenerator:
             if top_left[0] < 0 or top_left[1] < 0 or bottom_right[0] > background.shape[1] or bottom_right[1] > background.shape[0]:
                 continue
 
-            purple = (128, 0, 128)
+            purple = (128, 0, 128, 1)
             cv2.rectangle(background, top_left, bottom_right, purple, 2)
 
         return background
@@ -469,6 +448,29 @@ class ImageGenerator:
         
         return image
 
+    def remove_transparent_pixels(self, image):
+        y, x = image[:, :, 3].nonzero()
+        minx = np.min(x)
+        miny = np.min(y)
+        maxx = np.max(x)
+        maxy = np.max(y) 
+        cropImage = image[miny:maxy, minx:maxx]
+        return cropImage
+
+    def random_color_offset(self, image, offset_percentage=(-0.1, 0.1)):
+
+        offset = random.uniform(*offset_percentage)
+        return image + (image * offset)
+        #color = (random.uniform(-COLOR_DEVIATION_FACTOR, COLOR_DEVIATION_FACTOR) + border_color[0], 
+        #                    random.uniform(-COLOR_DEVIATION_FACTOR, COLOR_DEVIATION_FACTOR) + border_color[1], 
+        #                    random.uniform(-COLOR_DEVIATION_FACTOR, COLOR_DEVIATION_FACTOR) + border_color[2], 1)
+
+    def add_white_filter(self, image, strength_range=(0.01, 0.4)):
+        strength = random.uniform(*strength_range)
+        white = np.full(image.shape, strength)
+        return image + white
+        
+
     # Takes in an image and a list of positions (as well as the file name) and creates the image file and saves the position data to later make the COCO file
     def output_image(self, image, positions, file_name, is_train=True):
 
@@ -538,6 +540,16 @@ class ImageGenerator:
         self.annotation_id = 0
         self.image_id = 0
 
+    def output_class_ids(self):
+
+        ids = []
+        for name, class_id in self.class_ids.items():
+            ids.append({"id": class_id, "name": name})
+
+        with open("id_to_name.json", "w") as f:
+            json.dump(ids, f, indent=4, default=int)
+
+
     # Takes in the name of the files you want to create and outputs an image and txt file with that name
     def generate_data(self, data_name, is_train=True):
 
@@ -546,12 +558,14 @@ class ImageGenerator:
         minimap = self.draw_misc(minimap, num_misc_to_draw=random.randint(10, 16))
         minimap, positions = self.draw_agents(minimap, num_agents_to_draw=random.randint(16, 40))
         minimap = self.add_gaussian_noise(minimap, sigma_range=(0.0, 0.01))
-        minimap = self.scale_artifact(minimap, scale_range=(0.8, 1.0))
-        minimap = self.apply_jpeg_compression(minimap, quality_range=(80, 100))
+        minimap = self.scale_artifact(minimap, scale_range=(0.5, 1.0))
+        minimap = self.apply_jpeg_compression(minimap, quality_range=(50, 100))
 
-        #minimap = self.make_random_invisible(minimap, percent_invisible=0.01)
-        #minimap = cv2.GaussianBlur(minimap, (3, 3), 0) if random.random() < 0.5 else minimap
+        minimap = cv2.GaussianBlur(minimap, (3, 3), 0) if random.random() < 0.5 else minimap
+        minimap = self.add_white_filter(minimap) if random.random() < 0.2 else minimap
 
+        minimap = self.make_random_invisible(minimap, percent_invisible=0.1)
+        
         # The next two could be helpful, but you'd need to recalculate the bounding boxes and I don't want to
         #minimap = self.skew_image(minimap, skew_angle_deg_x=random.randint(-10, 10), skew_angle_deg_y=random.randint(-10, 10))
         #minimap = self.rotate_image_randomly(minimap, angle_range=(-10, 10))

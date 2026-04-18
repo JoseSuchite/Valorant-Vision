@@ -40,6 +40,7 @@ if __name__ == "__main__":
     
     print("Creating COCO file...")
     generator.save_coco(is_train=False)
+    generator.output_class_ids()
     print("COCO file created")
     print("Finished :)")
 

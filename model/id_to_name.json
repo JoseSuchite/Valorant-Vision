@@ -1,116 +1,226 @@
-{
-  "categories": [
+[
     {
-      "id": 1,
-      "name": "Yoru_icon"
+        "id": 1,
+        "name": "Astra_icon_enemy"
     },
     {
-      "id": 2,
-      "name": "Gekko_icon"
+        "id": 2,
+        "name": "Astra_icon_friendly"
     },
     {
-      "id": 3,
-      "name": "Neon_icon"
+        "id": 3,
+        "name": "Breach_icon_enemy"
     },
     {
-      "id": 4,
-      "name": "Jett_icon"
+        "id": 4,
+        "name": "Breach_icon_friendly"
     },
     {
-      "id": 5,
-      "name": "Viper_icon"
+        "id": 5,
+        "name": "Brimstone_icon_enemy"
     },
     {
-      "id": 6,
-      "name": "Fade_icon"
+        "id": 6,
+        "name": "Brimstone_icon_friendly"
     },
     {
-      "id": 7,
-      "name": "Sage_icon"
+        "id": 7,
+        "name": "Chamber_icon_enemy"
     },
     {
-      "id": 8,
-      "name": "Brimstone_icon"
+        "id": 8,
+        "name": "Chamber_icon_friendly"
     },
     {
-      "id": 9,
-      "name": "Clove_icon"
+        "id": 9,
+        "name": "Clove_icon_enemy"
     },
     {
-      "id": 10,
-      "name": "Killjoy_icon"
+        "id": 10,
+        "name": "Clove_icon_friendly"
     },
     {
-      "id": 11,
-      "name": "Deadlock_icon"
+        "id": 11,
+        "name": "Cypher_icon_enemy"
     },
     {
-      "id": 12,
-      "name": "Miks_icon"
+        "id": 12,
+        "name": "Cypher_icon_friendly"
     },
     {
-      "id": 13,
-      "name": "Skye_icon"
+        "id": 13,
+        "name": "Deadlock_icon_enemy"
     },
     {
-      "id": 14,
-      "name": "Astra_icon"
+        "id": 14,
+        "name": "Deadlock_icon_friendly"
     },
     {
-      "id": 15,
-      "name": "Sova_icon"
+        "id": 15,
+        "name": "Fade_icon_enemy"
     },
     {
-      "id": 16,
-      "name": "Omen_icon"
+        "id": 16,
+        "name": "Fade_icon_friendly"
     },
     {
-      "id": 17,
-      "name": "Chamber_icon"
+        "id": 17,
+        "name": "Gekko_icon_enemy"
     },
     {
-      "id": 18,
-      "name": "Veto_icon"
+        "id": 18,
+        "name": "Gekko_icon_friendly"
     },
     {
-      "id": 19,
-      "name": "Phoenix_icon"
+        "id": 19,
+        "name": "Iso_icon_enemy"
     },
     {
-      "id": 20,
-      "name": "Vyse_icon"
+        "id": 20,
+        "name": "Iso_icon_friendly"
     },
     {
-      "id": 21,
-      "name": "Waylay_icon"
+        "id": 21,
+        "name": "Jett_icon_enemy"
     },
     {
-      "id": 22,
-      "name": "Cypher_icon"
+        "id": 22,
+        "name": "Jett_icon_friendly"
     },
     {
-      "id": 23,
-      "name": "Raze_icon"
+        "id": 23,
+        "name": "KAYO_icon_enemy"
     },
     {
-      "id": 24,
-      "name": "Reyna_icon"
+        "id": 24,
+        "name": "KAYO_icon_friendly"
     },
     {
-      "id": 25,
-      "name": "Tejo_icon"
+        "id": 25,
+        "name": "Killjoy_icon_enemy"
     },
     {
-      "id": 26,
-      "name": "Iso_icon"
+        "id": 26,
+        "name": "Killjoy_icon_friendly"
     },
     {
-      "id": 27,
-      "name": "Breach_icon"
+        "id": 27,
+        "name": "Miks_icon_enemy"
     },
     {
-      "id": 28,
-      "name": "KAYO_icon"
+        "id": 28,
+        "name": "Miks_icon_friendly"
+    },
+    {
+        "id": 29,
+        "name": "Neon_icon_enemy"
+    },
+    {
+        "id": 30,
+        "name": "Neon_icon_friendly"
+    },
+    {
+        "id": 31,
+        "name": "Omen_icon_enemy"
+    },
+    {
+        "id": 32,
+        "name": "Omen_icon_friendly"
+    },
+    {
+        "id": 33,
+        "name": "Phoenix_icon_enemy"
+    },
+    {
+        "id": 34,
+        "name": "Phoenix_icon_friendly"
+    },
+    {
+        "id": 35,
+        "name": "Raze_icon_enemy"
+    },
+    {
+        "id": 36,
+        "name": "Raze_icon_friendly"
+    },
+    {
+        "id": 37,
+        "name": "Reyna_icon_enemy"
+    },
+    {
+        "id": 38,
+        "name": "Reyna_icon_friendly"
+    },
+    {
+        "id": 39,
+        "name": "Sage_icon_enemy"
+    },
+    {
+        "id": 40,
+        "name": "Sage_icon_friendly"
+    },
+    {
+        "id": 41,
+        "name": "Skye_icon_enemy"
+    },
+    {
+        "id": 42,
+        "name": "Skye_icon_friendly"
+    },
+    {
+        "id": 43,
+        "name": "Sova_icon_enemy"
+    },
+    {
+        "id": 44,
+        "name": "Sova_icon_friendly"
+    },
+    {
+        "id": 45,
+        "name": "Tejo_icon_enemy"
+    },
+    {
+        "id": 46,
+        "name": "Tejo_icon_friendly"
+    },
+    {
+        "id": 47,
+        "name": "Veto_icon_enemy"
+    },
+    {
+        "id": 48,
+        "name": "Veto_icon_friendly"
+    },
+    {
+        "id": 49,
+        "name": "Viper_icon_enemy"
+    },
+    {
+        "id": 50,
+        "name": "Viper_icon_friendly"
+    },
+    {
+        "id": 51,
+        "name": "Vyse_icon_enemy"
+    },
+    {
+        "id": 52,
+        "name": "Vyse_icon_friendly"
+    },
+    {
+        "id": 53,
+        "name": "Waylay_icon_enemy"
+    },
+    {
+        "id": 54,
+        "name": "Waylay_icon_friendly"
+    },
+    {
+        "id": 55,
+        "name": "Yoru_icon_enemy"
+    },
+    {
+        "id": 56,
+        "name": "Yoru_icon_friendly"
     }
-  ]
-}
+]
