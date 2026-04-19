@@ -7,14 +7,25 @@
 #include <QAudioOutput>
 #include <QVideoWidget>
 #include <QSlider>
+#include <QtGlobal>
+#include <QMetaObject>
+
+#include "modelwrapper.h"
 
 class VideoPlayer : public QWidget {
 
+	Q_OBJECT
+
 private:
+
 	QMediaPlayer *player;
 	QVideoWidget *videoWidget;
 	QAudioOutput *audioOutput;
 	QSlider *slider;
+
+	ModelWrapper modelWrapper;
+
+	double currentVideoFPS = 0;
 
 public:
 	// Takes in a pointer to the parent object
@@ -25,6 +36,20 @@ public:
 
 	//Pauses or plays video (depends on state)
 	void pauseOrPlayVideo();
+
+	//Sets volume for the player
+	void setVolume(float volume);
+
+
+	void onFrameChange(qint64 NthMillisecond);
+
+	qint64 currentPositionMs() const;
+
+signals:
+	void frameChanged(Eigen::MatrixXf frameData);
+	void videoPlaying(qint64 positionMs);
+	void videoPaused();
+	void videoPositionChanged(qint64 positionMs);
 };
 
 #endif
