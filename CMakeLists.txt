@@ -194,6 +194,10 @@ add_custom_command(
             "$<TARGET_FILE_DIR:${PROJECT_NAME}>"
 )
 
+# So we know where the 
+target_compile_definitions(Valorant-Vision PRIVATE
+    PROJECT_ROOT="${CMAKE_SOURCE_DIR}"
+) 
 
 # For adding logo to the app window
 qt_add_resources(APP_RESOURCES resources.qrc)
