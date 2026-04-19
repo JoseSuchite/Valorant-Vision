@@ -83,7 +83,7 @@ MainWindow::MainWindow() :
     // Pre-load all team abbreviations from VLR.gg ranking pages so OCR can
     // recognise any pro team, not just the hardcoded fallback list.
     std::thread([this]() {
-        std::vector<std::string> abbrevs = TextDetection::scrapeAllTeamAbbreviations();
+        std::vector<std::string> abbrevs = WebScraper::scrapeAllTeamAbbreviations();
         if (!abbrevs.empty()) {
             QMetaObject::invokeMethod(ocrDetector, [this, abbrevs]() {
                 ocrDetector->setTeamNames(abbrevs);
@@ -120,12 +120,12 @@ void MainWindow::onTeamsDetected(QString left, QString right)
     std::string a = left.toStdString();
     std::string b = right.toStdString();
     std::thread([this, a, b]() {
-        bool ok = TextDetection::prepareForMatch(a, b);
+        bool ok = WebScraper::prepareForMatch(a, b);
         if (!ok) return;
 
         // Build name->team pairs for OCRDetector
         std::vector<std::pair<std::string,std::string>> records;
-        for (const auto& p : TextDetection::getPlayers())
+        for (const auto& p : WebScraper::getPlayers())
             records.emplace_back(p.name, p.team);
 
         QMetaObject::invokeMethod(ocrDetector, [this, records]() {
