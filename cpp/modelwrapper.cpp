@@ -66,7 +66,7 @@ void ModelWrapper::startProcessingLoop(const std::string fileName, const int RUN
 
 	EVERY_N_FRAMES = RUN_EVERY_N_FRAMES;
 
-	if (model == nullptr) {
+	if (model == nullptr) { //TODO: Change this back to being done in the constructor. I don't know why someone changed it to be here. The constructor should be responsible for initializaing the model...
 		const int ROWS = 384;
 		const int COLS = 384;
 		try {
