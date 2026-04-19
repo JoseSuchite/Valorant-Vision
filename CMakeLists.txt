@@ -149,7 +149,7 @@ add_custom_command(
 add_custom_command(
     TARGET ${PROJECT_NAME} POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
-            "${CMAKE_SOURCE_DIR}/model/agent_icons"
+            "${CMAKE_SOURCE_DIR}/model/agent_icons_round"
             "$<TARGET_FILE_DIR:${PROJECT_NAME}>/agent_icons"
 )
 
@@ -194,7 +194,7 @@ add_custom_command(
             "$<TARGET_FILE_DIR:${PROJECT_NAME}>"
 )
 
-# So we know where the 
+# So we know where the root of the project is
 target_compile_definitions(Valorant-Vision PRIVATE
     PROJECT_ROOT="${CMAKE_SOURCE_DIR}"
 ) 
