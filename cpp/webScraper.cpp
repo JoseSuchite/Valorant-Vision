@@ -421,10 +421,12 @@ bool WebScraper::scrapeTeamsByAbbreviation(const std::string& teamA, const std::
     if (!foundA) std::cerr << "Could not find team " << teamA << "\n";
     if (!foundB) std::cerr << "Could not find team " << teamB << "\n";
 
+    bool anyTeamFound = foundA || foundB;
+
     if (!proPlayers.empty())
         savePlayersToFile();
 
-    return foundA && foundB;
+    return anyTeamFound;
 }
 
 // If we couldn't find the teams by their abbreviations and there's no existing players.txt file, show a dialog to select regions to scrape all teams from
@@ -474,7 +476,7 @@ std::vector<std::string> WebScraper::promptRegionSelection()
 	// Horizontal layout for OK and Cancel buttons
     QHBoxLayout* buttons = new QHBoxLayout();
     QPushButton* ok = new QPushButton("Scrape Selected");
-    QPushButton* cancel = new QPushButton("Skip — Scrape All");
+    QPushButton* cancel = new QPushButton("Skip - Scrape All");
     buttons->addWidget(ok);
     buttons->addWidget(cancel);
     layout->addLayout(buttons);
@@ -552,106 +554,103 @@ void WebScraper::scrapePlayers()
 // Main initialization function called by main.cpp after OCR attempts to detect teams
 bool WebScraper::prepareForMatch(const std::string& teamA, const std::string& teamB)
 {
-	// Log the team abbreviations we're looking for the ones being passed in 
     std::cout << "Looking for teams: " << teamA << " / " << teamB << "\n";
     std::cout.flush();
 
-	// try to scrape the teams directly by their abbreviations first
-    if (!teamA.empty() && !teamB.empty())
-    {
-        if (scrapeTeamsByAbbreviation(teamA, teamB))
+    proPlayers.clear();
+    playerSet.clear();
+    teamLinks.clear();
+
+    auto tryTeam = [&](const std::string& team) -> bool
         {
-            std::cout << "Both teams scraped successfully.\n";
-            return true;
+            if (team.empty())
+                return false;
+
+            std::cout << "Searching for: " << team << "\n";
+
+            std::string searchHTML =
+                downloadPage("https://www.vlr.gg/search/?q=" + team + "&type=teams");
+
+            if (searchHTML.empty())
+                return false;
+
+            teamLinks.clear();
+            extractTeams(searchHTML);
+
+            for (const auto& url : teamLinks)
+            {
+                std::string html = downloadPage(url);
+                if (html.empty()) continue;
+
+                std::string tag = extractTeamTag(html);
+
+                if (tag == team)
+                {
+                    std::cout << "Found team: " << tag << "\n";
+                    extractPlayers(html);
+                    return true;
+                }
+            }
+
+            return false;
+        };
+
+    bool foundA = tryTeam(teamA);
+    bool foundB = tryTeam(teamB);
+
+    std::cout << "Team A: " << (foundA ? "GOOD" : "MISSING") << "\n";
+    std::cout << "Team B: " << (foundB ? "GOOD" : "MISSING") << "\n";
+
+    bool bothFound = foundA && foundB;
+
+    if (!proPlayers.empty())
+        savePlayersToFile();
+
+	// If we couldn't find one or both teams by their abbreviations and there's no existing players.txt file,
+    // prompt the user to select regions to scrape
+    if (!bothFound)
+    {
+		// Output message to console to explain the situation to the user before showing the dialog
+        std::cout << "One or more teams missing: prompting region selection...\n";
+		std::cout << "Region Selection clears any current team, please make sure to select both regions that the teams are from \n";
+
+        std::vector<std::string> regions = promptRegionSelection();
+
+		// If the user selected regions, scrape all teams from those regions and then scrape players from those teams
+        if (!regions.empty())
+        {
+
+            teamLinks.clear();
+
+            for (const auto& url : regions)
+            {
+                std::string html = downloadPage(url);
+                if (!html.empty())
+                    extractTeams(html);
+            }
+
+            std::cout << "Team pages found: " << teamLinks.size() << "\n";
+
+            for (const auto& url : teamLinks)
+            {
+                std::string html = downloadPage(url);
+                if (!html.empty())
+                    extractPlayers(html);
+            }
+
+            std::cout << "Players after fallback: " << proPlayers.size() << "\n";
+
+            if (!proPlayers.empty())
+                savePlayersToFile();
         }
-        std::cout << "Targeted scrape failed.\n";
+
+        else
+        {
+			// If the user skipped the region selection or didn't select any regions, fall back to scraping all teams from all regions
+			scrapePlayers();
+        }
     }
 
-	// next check if there's an existing players.txt file we can load from
-    if (fileExists())
-    {
-        std::cout << "Loading existing players.txt...\n";
-        loadPlayersFromFile();
-        return !proPlayers.empty();
-    }
-
-	// if there is no file, prompt the user to select regions to scrape from
-    std::cout << "No players.txt found, prompting region selection...\n";
-    std::cout.flush();
-    std::vector<std::string> regions = promptRegionSelection();
-
-	// if the user selected regions, scrape teams and players from those regions, otherwise fall back to scraping all regions
-    if (!regions.empty())
-    {
-        proPlayers.clear();
-        playerSet.clear();
-        teamLinks.clear();
-
-		// First, scrape the selected region ranking pages to find team page URLs
-        for (const auto& url : regions)
-        {
-            std::cout << "Downloading: " << url << "\n";
-            std::cout.flush();
-            std::string html = downloadPage(url);
-            if (!html.empty())
-                extractTeams(html);
-        }
-
-		// Log the number of team pages found from the selected regions before scraping player information
-        std::cout << "Team pages found: " << teamLinks.size() << "\n";
-
-		// Then, for each team page URL found, scrape the player names and teams to populate proPlayers
-        for (const auto& url : teamLinks)
-        {
-            std::cout << "Scraping: " << url << "\n";
-            std::cout.flush();
-            std::string html = downloadPage(url);
-            if (!html.empty())
-                extractPlayers(html);
-        }
-
-		// Log the number of players scraped from the selected regions before saving to file
-        std::cout << "Players scraped: " << proPlayers.size() << "\n";
-
-        if (!proPlayers.empty())
-        {
-            savePlayersToFile();
-            return true;
-        }
-    }
-
-    // if all else fails, run a full scrape of all regions 
-    std::cout << "Running full scrape of all regions...\n";
-    scrapePlayers();
     return !proPlayers.empty();
 }
 
-/* Uncomment if you want to debug only two teams. 
-void WebScraper::scrapeDebugTeams()
-{
-    proPlayers.clear();
-    playerSet.clear();
-
-    static const std::vector<std::string> debugTeams = {
-        "https://www.vlr.gg/team/2593/paper-rex",
-        "https://www.vlr.gg/team/624/sentinels",
-    };
-
-    for (const auto& url : debugTeams)
-    {
-        std::cout << "[DEBUG] Scraping: " << url << "\n";
-        std::cout.flush();
-        std::string html = downloadPage(url);
-        if (html.empty()) continue;
-
-        std::string tag = extractPlayers(html);
-        if (tag.empty())
-            std::cerr << "[DEBUG] No team tag found for: " << url << "\n";
-        else
-            std::cout << "[DEBUG] Scraped team: " << tag << "\n";
-    }
-
-    std::cout << "[DEBUG] Total players: " << proPlayers.size() << "\n";
-    savePlayersToFile();
-}
-*/
