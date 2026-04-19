@@ -35,7 +35,7 @@ std::unordered_set<std::string> WebScraper::playerSet;   // Stores player names
 // These functions are used internally for file handling, network requests, and HTML parsing.
 namespace {
 
-	// Callback for libcurl to write downloaded data into a string
+    // Callback for libcurl to write downloaded data into a string
     static size_t WriteCallback(void* contents, size_t size, size_t nmemb, void* userp)
     {
         size_t totalSize = size * nmemb;
@@ -45,19 +45,19 @@ namespace {
     }
 
     // Resolves to the executable's directory so paths work regardless of working directory
-	// Inject PROJECT_ROOT via CMakeLists.txt 
+    // Inject PROJECT_ROOT via CMakeLists.txt 
     std::filesystem::path dataDir()
     {
         return std::filesystem::path(PROJECT_ROOT) / "data";
     }
 
-	// Full path to players.txt
+    // Full path to players.txt
     std::filesystem::path playersFilePath()
     {
         return dataDir() / "players.txt";
     }
 
-	// Trim whitespace from both ends of a string
+    // Trim whitespace from both ends of a string
     void trim(std::string& s)
     {
         auto start = s.find_first_not_of(" \t\r\n");
@@ -66,7 +66,7 @@ namespace {
         s = s.substr(start, end - start + 1);
     }
 
-} 
+}
 
 // public getter for main.cpp to access loaded roster
 const std::vector<PlayerRecord>& WebScraper::getPlayers()
@@ -80,11 +80,11 @@ bool WebScraper::fileExists()
 {
     std::error_code ec;
 
-	// Check if file exists
+    // Check if file exists
     if (!std::filesystem::exists(playersFilePath(), ec) || ec)
         return false;
 
-	// Check if file is non-empty by looking for at least one non-empty line
+    // Check if file is non-empty by looking for at least one non-empty line
     std::ifstream file(playersFilePath());
     if (!file.is_open())
         return false;
@@ -99,11 +99,11 @@ bool WebScraper::fileExists()
 // Reads from players.txt and populates proPlayers and playerSet
 void WebScraper::loadPlayersFromFile()
 {
-	// Clear existing data before loading new data
+    // Clear existing data before loading new data
     proPlayers.clear();
     playerSet.clear();
 
-	// Check if file exists before trying to read
+    // Check if file exists before trying to read
     std::ifstream file(playersFilePath());
     if (!file.is_open())
     {
@@ -111,7 +111,7 @@ void WebScraper::loadPlayersFromFile()
         return;
     }
 
-	// Read each line, expecting format: "TEAM PLAYERNAME"
+    // Read each line, expecting format: "TEAM PLAYERNAME"
     std::string line;
     while (std::getline(file, line))
     {
@@ -134,24 +134,24 @@ void WebScraper::savePlayersToFile()
 {
     namespace fs = std::filesystem;
 
-	// Ensure data directory exists
+    // Ensure data directory exists
     fs::path dir = dataDir();
     std::error_code ec;
     if (!fs::exists(dir, ec))
         fs::create_directories(dir, ec);
 
-	// Open file for writing (overwrites existing file)
+    // Open file for writing (overwrites existing file)
     fs::path filePath = playersFilePath();
     std::ofstream file(filePath);
 
-	// Check if file opened successfully
+    // Check if file opened successfully
     if (!file.is_open())
     {
         std::cerr << "Failed to open " << filePath << "\n";
         return;
     }
 
-	// Write each player record in "TEAM PLAYERNAME" format
+    // Write each player record in "TEAM PLAYERNAME" format
     for (const auto& p : proPlayers)
         file << p.team << " " << p.name << "\n";
 
@@ -175,7 +175,7 @@ std::string WebScraper::downloadPage(const std::string& url, int maxRetries)
     curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 5L);
     curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10L);
 
-	// Attempt the request with retries
+    // Attempt the request with retries
     CURLcode res = CURLE_FAILED_INIT;
     for (int attempt = 0; attempt < maxRetries; ++attempt)
     {
@@ -188,16 +188,67 @@ std::string WebScraper::downloadPage(const std::string& url, int maxRetries)
         std::cout.flush();
     }
 
-	// Clean up curl resources
+    // Clean up curl resources
     curl_easy_cleanup(curl);
 
-	// If all attempts failed, return empty string
+    // If all attempts failed, return empty string
     if (res != CURLE_OK)
     {
         std::cerr << "All retries failed for: " << url << "\n";
         return "";
     }
     return html;
+}
+
+// Scrapes all team abbreviations from the ranking pages without visiting individual team pages
+std::vector<std::string> WebScraper::scrapeAllTeamAbbreviations()
+{
+    static const std::vector<std::string> regions = {
+        "https://www.vlr.gg/rankings/europe",
+        "https://www.vlr.gg/rankings/north-america",
+        "https://www.vlr.gg/rankings/brazil",
+        "https://www.vlr.gg/rankings/asia-pacific",
+        "https://www.vlr.gg/rankings/china",
+        "https://www.vlr.gg/rankings/japan",
+        "https://www.vlr.gg/rankings/la-s",
+        "https://www.vlr.gg/rankings/la-n",
+        "https://www.vlr.gg/rankings/oceania",
+        "https://www.vlr.gg/rankings/gc",
+        "https://www.vlr.gg/rankings/mena",
+        "https://www.vlr.gg/rankings/collegiate"
+    };
+
+    // Team abbreviations appear inline on ranking pages in this span —
+    // no need to visit individual team pages.
+    std::regex tagRegex(R"(<span class="m-item-team-tag">\s*([^<]+?)\s*</span>)");
+
+    std::unordered_set<std::string> seen;
+    std::vector<std::string> result;
+
+    for (const auto& url : regions)
+    {
+        std::string html = downloadPage(url);
+        if (html.empty()) continue;
+
+        std::smatch match;
+        std::string remaining = html;
+        while (std::regex_search(remaining, match, tagRegex))
+        {
+            std::string tag = match[1].str();
+            auto s = tag.find_first_not_of(" \t\r\n");
+            auto e = tag.find_last_not_of(" \t\r\n");
+            if (s != std::string::npos)
+                tag = tag.substr(s, e - s + 1);
+
+            if (!tag.empty() && seen.insert(tag).second)
+                result.push_back(tag);
+
+            remaining = match.suffix().str();
+        }
+    }
+
+    std::cout << "Scraped " << result.size() << " team abbreviations.\n";
+    return result;
 }
 
 // Extracts team page URLs from the main teams listing page HTML and stores them in teamLinks
@@ -219,8 +270,8 @@ std::string WebScraper::extractTeamTag(const std::string& html)
 {
     std::smatch match;
 
-	// Primary regex looks for the main team header tag
-	std::regex primaryRegex(R"(<h2 class="wf-title team-header-tag">([^<]+)</h2>)");    // uses html, so if they change the structure of the page this might break
+    // Primary regex looks for the main team header tag
+    std::regex primaryRegex(R"(<h2 class="wf-title team-header-tag">([^<]+)</h2>)");    // uses html, so if they change the structure of the page this might break
     if (std::regex_search(html, match, primaryRegex))
     {
         std::string tag = match[1].str();
@@ -228,7 +279,7 @@ std::string WebScraper::extractTeamTag(const std::string& html)
         return tag;
     }
 
-	std::regex fallbackRegex(R"(<span class="m-item-team-tag">\s*([^<]+?)\s*</span>)"); // uses html, so if they change the structure of the page this might break
+    std::regex fallbackRegex(R"(<span class="m-item-team-tag">\s*([^<]+?)\s*</span>)"); // uses html, so if they change the structure of the page this might break
     if (std::regex_search(html, match, fallbackRegex))
     {
         std::string tag = match[1].str();
@@ -245,14 +296,14 @@ std::string WebScraper::extractPlayers(const std::string& html)
     std::unordered_set<std::string> teamPlayerSet;
     std::string teamName = extractTeamTag(html);
 
-	// If we can't find the team name, return early
+    // If we can't find the team name, return early
     if (teamName.empty())
     {
         std::cerr << "Could not find team abbreviation (tag) in page HTML\n";
         return "";
     }
 
-	// team page has separate sections for players and staff so declare labels and search for them to isolate the players section
+    // team page has separate sections for players and staff so declare labels and search for them to isolate the players section
     const std::string playersLabel = "wf-module-label";
     const std::string playersText = "players";
     const std::string staffText = "staff";
@@ -260,26 +311,26 @@ std::string WebScraper::extractPlayers(const std::string& html)
     size_t playersPos = std::string::npos;
     size_t searchPos = 0;
 
-	// Searches through the HTML to find the position of the "players" section by looking for the label and matching its text content
-	// Once again relies on HTML structure, so if they change the page this might break
+    // Searches through the HTML to find the position of the "players" section by looking for the label and matching its text content
+    // Once again relies on HTML structure, so if they change the page this might break
     while (searchPos < html.size())
     {
-		// Find the next label element
+        // Find the next label element
         size_t labelPos = html.find(playersLabel, searchPos);
         if (labelPos == std::string::npos) break;
 
-		// Find the closing '>' of the label tag
+        // Find the closing '>' of the label tag
         size_t closeTag = html.find('>', labelPos);
         if (closeTag == std::string::npos) break;
 
-		// Find the next '<' which indicates the end of the label content
+        // Find the next '<' which indicates the end of the label content
         size_t nextClose = html.find('<', closeTag + 1);
         if (nextClose == std::string::npos) break;
 
-		// Extract the text content of the label
+        // Extract the text content of the label
         std::string labelContent = html.substr(closeTag + 1, nextClose - closeTag - 1);
 
-		// Trim whitespace from label content before comparing to "players"
+        // Trim whitespace from label content before comparing to "players"
         auto s = labelContent.find_first_not_of(" \t\r\n");
         auto e = labelContent.find_last_not_of(" \t\r\n");
         std::string trimmed = (s == std::string::npos) ? "" : labelContent.substr(s, e - s + 1);
@@ -296,14 +347,14 @@ std::string WebScraper::extractPlayers(const std::string& html)
     if (playersPos == std::string::npos)
         return "";
 
-	// Now find the position of the "staff" section which comes after players to determine the end of the players section
+    // Now find the position of the "staff" section which comes after players to determine the end of the players section
     size_t staffPos = html.size();
     size_t searchPos2 = playersPos;
 
-	// Similar search loop to find the "staff" label and its position in the HTML
+    // Similar search loop to find the "staff" label and its position in the HTML
     while (searchPos2 < html.size())
     {
-		// Same loop as before but looking for "staff" instead of "players"
+        // Same loop as before but looking for "staff" instead of "players"
         size_t labelPos = html.find(playersLabel, searchPos2);
         if (labelPos == std::string::npos) break;
 
@@ -328,10 +379,10 @@ std::string WebScraper::extractPlayers(const std::string& html)
         searchPos2 = labelPos + 1;
     }
 
-	// Extract the HTML section that contains the players by taking the substring between the "players" and "staff" positions
+    // Extract the HTML section that contains the players by taking the substring between the "players" and "staff" positions
     std::string playersSection = html.substr(playersPos, staffPos - playersPos);
 
-	// Now we have the section of the HTML that contains player entries, we can use a regex to extract each player's name
+    // Now we have the section of the HTML that contains player entries, we can use a regex to extract each player's name
     std::regex blockRegex(
         R"(<div class="team-roster-item-name-alias">\s*([\s\S]*?)\s*</div>)"
     );
@@ -341,7 +392,7 @@ std::string WebScraper::extractPlayers(const std::string& html)
     std::string remaining = playersSection;
     std::smatch match;
 
-	// Loop through each player entry found by the regex, extract the player's name, trim whitespace, and add to the roster if it's not a duplicate 
+    // Loop through each player entry found by the regex, extract the player's name, trim whitespace, and add to the roster if it's not a duplicate 
     while (std::regex_search(remaining, match, blockRegex))
     {
         std::string inner = match[1].str();
@@ -377,25 +428,25 @@ bool WebScraper::scrapeTeamsByAbbreviation(const std::string& teamA, const std::
     proPlayers.clear();
     playerSet.clear();
 
-	// Flags to track if we successfully found and scraped each team
+    // Flags to track if we successfully found and scraped each team
     bool foundA = false, foundB = false;
 
-	// For each team abbreviation, perform a search on VLR.gg and look through the results for a matching team page
+    // For each team abbreviation, perform a search on VLR.gg and look through the results for a matching team page
     for (const auto& abbr : { teamA, teamB })
     {
         std::cout << "Searching VLR.gg for: " << abbr << "\n";
-        std::cout.flush(); 
+        std::cout.flush();
 
-		// Download the search results page for the team abbreviation
+        // Download the search results page for the team abbreviation
         std::string searchHTML = downloadPage("https://www.vlr.gg/search/?q=" + abbr + "&type=teams");
 
         if (searchHTML.empty()) continue;
 
-		// Extract team page URLs from the search results HTML and store them in teamLinks
+        // Extract team page URLs from the search results HTML and store them in teamLinks
         teamLinks.clear();
         extractTeams(searchHTML);
 
-		// Loop through the team page URLs found in the search results and check if any of them match the desired team abbreviation
+        // Loop through the team page URLs found in the search results and check if any of them match the desired team abbreviation
         for (const auto& url : teamLinks)
         {
             std::cout << "Checking: " << url << "\n";
@@ -417,7 +468,7 @@ bool WebScraper::scrapeTeamsByAbbreviation(const std::string& teamA, const std::
         }
     }
 
-	// Failure warnings for debugging/validation if we couldn't find one or both teams by their abbreviations
+    // Failure warnings for debugging/validation if we couldn't find one or both teams by their abbreviations
     if (!foundA) std::cerr << "Could not find team " << teamA << "\n";
     if (!foundB) std::cerr << "Could not find team " << teamB << "\n";
 
@@ -433,7 +484,7 @@ bool WebScraper::scrapeTeamsByAbbreviation(const std::string& teamA, const std::
 // Could use more styling, is very basic pop up right now 
 std::vector<std::string> WebScraper::promptRegionSelection()
 {
-	// List of regions and their corresponding VLR.gg ranking page URLs
+    // List of regions and their corresponding VLR.gg ranking page URLs
     static const std::vector<std::pair<std::string, std::string>> regionList = {
         { "Europe",        "https://www.vlr.gg/rankings/europe"        },
         { "North America", "https://www.vlr.gg/rankings/north-america" },
@@ -451,29 +502,29 @@ std::vector<std::string> WebScraper::promptRegionSelection()
 
     std::vector<std::string> selected;
 
-	// Create a dialog with a list of regions and OK/Cancel buttons
+    // Create a dialog with a list of regions and OK/Cancel buttons
     QDialog dialog;
     dialog.setWindowTitle("Select Regions to Scrape");
     dialog.setMinimumWidth(300);
 
-	// Vertical layout for the dialog
+    // Vertical layout for the dialog
     QVBoxLayout* layout = new QVBoxLayout(&dialog);
 
-	// Instruction label at the top of the dialog
+    // Instruction label at the top of the dialog
     QLabel* label = new QLabel(
         "Could not find teams via search.\n"
         "Select regions to scrape all teams from:"
     );
     layout->addWidget(label);
 
-	// List widget to display regions with multi-selection enabled
+    // List widget to display regions with multi-selection enabled
     QListWidget* list = new QListWidget();
     list->setSelectionMode(QAbstractItemView::MultiSelection);
     for (const auto& region : regionList)
         list->addItem(QString::fromStdString(region.first));
     layout->addWidget(list);
 
-	// Horizontal layout for OK and Cancel buttons
+    // Horizontal layout for OK and Cancel buttons
     QHBoxLayout* buttons = new QHBoxLayout();
     QPushButton* ok = new QPushButton("Scrape Selected");
     QPushButton* cancel = new QPushButton("Skip - Scrape All");
@@ -481,11 +532,11 @@ std::vector<std::string> WebScraper::promptRegionSelection()
     buttons->addWidget(cancel);
     layout->addLayout(buttons);
 
-	// Connect button signals to dialog slots for accepting or rejecting the selection
+    // Connect button signals to dialog slots for accepting or rejecting the selection
     QObject::connect(ok, &QPushButton::clicked, &dialog, &QDialog::accept);
     QObject::connect(cancel, &QPushButton::clicked, &dialog, &QDialog::reject);
 
-	// Execute the dialog and if the user accepted, gather the selected regions' URLs based on their selection in the list widget
+    // Execute the dialog and if the user accepted, gather the selected regions' URLs based on their selection in the list widget
     if (dialog.exec() == QDialog::Accepted)
     {
         for (auto* item : list->selectedItems())
@@ -502,12 +553,12 @@ std::vector<std::string> WebScraper::promptRegionSelection()
 // and the user either skipped the region selection or didn't select any regions
 void WebScraper::scrapePlayers()
 {
-	// Clear any existing data before starting the full scrape
+    // Clear any existing data before starting the full scrape
     proPlayers.clear();
     teamLinks.clear();
     playerSet.clear();
 
-	// List of all region ranking page URLs to scrape teams from
+    // List of all region ranking page URLs to scrape teams from
     static const std::vector<std::string> regions = {
         "https://www.vlr.gg/rankings/europe",
         "https://www.vlr.gg/rankings/north-america",
@@ -523,21 +574,21 @@ void WebScraper::scrapePlayers()
         "https://www.vlr.gg/rankings/collegiate"
     };
 
-	// First, scrape all the team pages from the region ranking pages to populate teamLinks
+    // First, scrape all the team pages from the region ranking pages to populate teamLinks
     std::cout << "Downloading all ranking pages...\n";
     for (const auto& region : regions)
     {
-		std::cout << "Scraping: " << region << "\n"; // Log the region being scraped
+        std::cout << "Scraping: " << region << "\n"; // Log the region being scraped
         std::cout.flush();
         std::string html = downloadPage(region);
         if (!html.empty())
             extractTeams(html);
     }
-    
-	// Then, for each team page URL found, scrape the player names and teams to populate proPlayers
+
+    // Then, for each team page URL found, scrape the player names and teams to populate proPlayers
     std::cout << "Teams found: " << teamLinks.size() << "\n";
 
-	// Loop through each team page URL in teamLinks, download the page, and extract player information
+    // Loop through each team page URL in teamLinks, download the page, and extract player information
     for (const auto& url : teamLinks)
     {
         std::cout << "Scraping: " << url << "\n";
@@ -606,17 +657,17 @@ bool WebScraper::prepareForMatch(const std::string& teamA, const std::string& te
     if (!proPlayers.empty())
         savePlayersToFile();
 
-	// If we couldn't find one or both teams by their abbreviations and there's no existing players.txt file,
+    // If we couldn't find one or both teams by their abbreviations and there's no existing players.txt file,
     // prompt the user to select regions to scrape
     if (!bothFound)
     {
-		// Output message to console to explain the situation to the user before showing the dialog
+        // Output message to console to explain the situation to the user before showing the dialog
         std::cout << "One or more teams missing: prompting region selection...\n";
-		std::cout << "Region Selection clears any current team, please make sure to select both regions that the teams are from \n";
+        std::cout << "Region Selection clears any current team, please make sure to select both regions that the teams are from \n";
 
         std::vector<std::string> regions = promptRegionSelection();
 
-		// If the user selected regions, scrape all teams from those regions and then scrape players from those teams
+        // If the user selected regions, scrape all teams from those regions and then scrape players from those teams
         if (!regions.empty())
         {
 
@@ -646,11 +697,10 @@ bool WebScraper::prepareForMatch(const std::string& teamA, const std::string& te
 
         else
         {
-			// If the user skipped the region selection or didn't select any regions, fall back to scraping all teams from all regions
-			scrapePlayers();
+            // If the user skipped the region selection or didn't select any regions, fall back to scraping all teams from all regions
+            scrapePlayers();
         }
     }
 
     return !proPlayers.empty();
 }
-
