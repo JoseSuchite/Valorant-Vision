@@ -119,7 +119,6 @@ void NeuralNetwork::predict(cv::Mat imageBGR) {
     // Get bounding boxes
     float *boxesArr = outputTensor[0].GetTensorMutableData<float>();
     auto info = outputTensor[0].GetTensorTypeAndShapeInfo();
-    std::cout << info.GetElementCount() << std::endl;
 
     // Get labels
     int64_t *labelsArr = outputTensor[1].GetTensorMutableData<int64_t>();
@@ -168,7 +167,7 @@ void NeuralNetwork::outputClassificationImageWithBoxesAndLabels(const cv::Mat im
         int xmax = prediction(i, 2);
         int ymax = prediction(i, 3);
 
-        cv::String text = std::to_string(prediction(i, 5)) + ": " + std::to_string((int)(prediction(i, 4) * 100)) + "%";
+        cv::String text = std::to_string((int)prediction(i, 5)) + ": " + std::to_string((int)(prediction(i, 4) * 100)) + "%";
 
         //Put label text on screen (the first one is to give an outline to the text (it is really hard to read otherwise))
         cv::putText(resizedImg, text, cv::Point(xmin, ymin - 10), cv::FONT_HERSHEY_SIMPLEX, 0.4, cv::Scalar(0, 0, 0), 3, cv::LINE_AA);
@@ -207,7 +206,7 @@ void NeuralNetwork::outputTrackingImageWithBoxesAndLabels(const cv::Mat image, E
 void NeuralNetwork::resetTracker(const int FPS) {
     delete tracker;
     
-    tracker = new motcpp::trackers::ByteTrack(0.2f,
+    tracker = new motcpp::trackers::ByteTrack(0.3f,
                                             80 * (30.0 / FPS),
                                             120,
                                             6,
@@ -216,10 +215,10 @@ void NeuralNetwork::resetTracker(const int FPS) {
                                             80, //Number of classes. It's fine to leave for now, but might cause issues if it goes over 80
                                             "iou",
                                             false,
-                                            0.05f,
-                                            0.3f,
-                                            0.6f,
-                                            80 * (30.0 / FPS) * 2.0,
+                                            0.5f,
+                                            0.45f,
+                                            0.8f,
+                                            80 * (30.0 / FPS),
                                             FPS);
 
     /*tracker = new motcpp::trackers::DeepOCSort("osnet_x1_0_dukemtmcreid.onnx",
