@@ -14,16 +14,10 @@ ModelWrapper::~ModelWrapper() {
 
 void ModelWrapper::loop(std::string fileName) {
 
-	/*const float LEFT_SIDE = 0.035;
-	const float RIGHT_SIDE = 0.2;
-	const float TOP_SIDE = 0.07;
-	const float BOTTOM_SIDE = 0.36;*/
-
-	const float LEFT_SIDE = 0.015;
-	const float RIGHT_SIDE = 0.25;
-	const float TOP_SIDE = 0.05;
-	const float BOTTOM_SIDE = 0.41;
-
+	const float LEFT_SIDE = 0.024;
+	const float RIGHT_SIDE = 0.235;
+	const float TOP_SIDE = 0.04;
+	const float BOTTOM_SIDE = 0.42;
 
 	std::cout << "Starting frame processing" << fileName << std::endl;
 
@@ -46,13 +40,11 @@ void ModelWrapper::loop(std::string fileName) {
 		cv::Rect ROI(LEFT_SIDE * width, TOP_SIDE * height, (RIGHT_SIDE - LEFT_SIDE) * width, (BOTTOM_SIDE - TOP_SIDE) * height);
 		cv::Mat croppedFrame = frame(ROI);
 
-		// TODO: cropout only the section with the minimap instead of just running it on the entire image (which will not work)
-
 
 		model->predict(croppedFrame);
 		Eigen::MatrixXf results = model->getCurrentTracking();
 		//model->outputTrackingImageWithBoxesAndLabels(croppedFrame, results, "frames/" + std::to_string(frameID) + ".png");
-		model->outputClassificationImageWithBoxesAndLabels(croppedFrame, results, 0.6, "frames/" + std::to_string(frameID) + ".png");
+		//model->outputClassificationImageWithBoxesAndLabels(croppedFrame, results, 0.6, "frames/" + std::to_string(frameID) + ".png");
 
 		lock.lock();
 		data.push_back(results);
@@ -60,6 +52,7 @@ void ModelWrapper::loop(std::string fileName) {
 
 		frameID++;
 	}
+
 }
 
 void ModelWrapper::endProcessingLoop() {
