@@ -1,11 +1,8 @@
 #include "modelwrapper.h"
 
 ModelWrapper::ModelWrapper() {
-
-	const int ROWS = 384;
-	const int COLS = 384;
-	model = new NeuralNetwork(T_TEXT("faster_rcnn.onnx"), ROWS, COLS);
-
+	// Model is loaded in startProcessingLoop to avoid crashing on startup
+	// if the working directory is not set correctly.
 }
 
 ModelWrapper::~ModelWrapper() {
@@ -17,16 +14,10 @@ ModelWrapper::~ModelWrapper() {
 
 void ModelWrapper::loop(std::string fileName) {
 
-	/*const float LEFT_SIDE = 0.035;
-	const float RIGHT_SIDE = 0.2;
-	const float TOP_SIDE = 0.07;
-	const float BOTTOM_SIDE = 0.36;*/
-
-	const float LEFT_SIDE = 0.015;
-	const float RIGHT_SIDE = 0.25;
-	const float TOP_SIDE = 0.05;
-	const float BOTTOM_SIDE = 0.41;
-
+	const float LEFT_SIDE = 0.024;
+	const float RIGHT_SIDE = 0.235;
+	const float TOP_SIDE = 0.04;
+	const float BOTTOM_SIDE = 0.42;
 
 	std::cout << "Starting frame processing" << fileName << std::endl;
 
@@ -49,13 +40,11 @@ void ModelWrapper::loop(std::string fileName) {
 		cv::Rect ROI(LEFT_SIDE * width, TOP_SIDE * height, (RIGHT_SIDE - LEFT_SIDE) * width, (BOTTOM_SIDE - TOP_SIDE) * height);
 		cv::Mat croppedFrame = frame(ROI);
 
-		// TODO: cropout only the section with the minimap instead of just running it on the entire image (which will not work)
-
 
 		model->predict(croppedFrame);
 		Eigen::MatrixXf results = model->getCurrentTracking();
 		//model->outputTrackingImageWithBoxesAndLabels(croppedFrame, results, "frames/" + std::to_string(frameID) + ".png");
-		model->outputClassificationImageWithBoxesAndLabels(croppedFrame, results, 0.6, "frames/" + std::to_string(frameID) + ".png");
+		//model->outputClassificationImageWithBoxesAndLabels(croppedFrame, results, 0.6, "frames/" + std::to_string(frameID) + ".png");
 
 		lock.lock();
 		data.push_back(results);
@@ -63,6 +52,7 @@ void ModelWrapper::loop(std::string fileName) {
 
 		frameID++;
 	}
+
 }
 
 void ModelWrapper::endProcessingLoop() {
@@ -75,6 +65,23 @@ void ModelWrapper::endProcessingLoop() {
 void ModelWrapper::startProcessingLoop(const std::string fileName, const int RUN_EVERY_N_FRAMES, const int FPS) {
 
 	EVERY_N_FRAMES = RUN_EVERY_N_FRAMES;
+
+	if (model == nullptr) {
+		const int ROWS = 384;
+		const int COLS = 384;
+		try {
+			model = new NeuralNetwork(T_TEXT("faster_rcnn.onnx"), ROWS, COLS);
+		}
+		catch (const Ort::Exception& e) {
+			std::cerr << "[ModelWrapper] Failed to load ONNX model: " << e.what() << std::endl;
+			return;
+		}
+		catch (const std::exception& e) {
+			std::cerr << "[ModelWrapper] Failed to load ONNX model: " << e.what() << std::endl;
+			return;
+		}
+	}
+
 	model->resetTracker(FPS / RUN_EVERY_N_FRAMES);
 	keepThreadAlive = true;
 

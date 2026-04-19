@@ -23,7 +23,6 @@ static QString layoutPathForName(const QString& name) {
     return "";
 }
 
-// Class index -> map name (matches training order from export)
 static QString yoloClassToMap(int idx) {
     switch (idx) {
     case 0: return "sunset";
@@ -40,14 +39,14 @@ static QString yoloClassToMap(int idx) {
     }
 }
 
-// Layer 2: YOLO via OpenCV DNN - no extra libraries needed
+// Layer 2: YOLO via OpenCV DNN - no extra libraries needed.
 // Samples multiple frames and accumulates scores so short detections
 // don't win over consistent ones.
+// Gracefully skips if map_detection.onnx is not found.
 static QString detectMapWithYOLO(const std::string& videoPath,
     double maxSeconds = 600.0,
     int    maxFrames = 20)
 {
-    // Load model once - path is relative to the exe
     static cv::dnn::Net net;
     static bool loaded = false;
     static bool failed = false;
@@ -55,7 +54,8 @@ static QString detectMapWithYOLO(const std::string& videoPath,
     if (failed) return "";
 
     if (!loaded) {
-        QString modelPath = QCoreApplication::applicationDirPath() + "/models/map_detection.onnx";
+        // Look for model next to the exe in a "model" folder
+        QString modelPath = QCoreApplication::applicationDirPath() + "/model/map_detection.onnx";
         try {
             net = cv::dnn::readNetFromONNX(modelPath.toStdString());
             net.setPreferableBackend(cv::dnn::DNN_BACKEND_OPENCV);
@@ -65,7 +65,7 @@ static QString detectMapWithYOLO(const std::string& videoPath,
         }
         catch (const cv::Exception& e) {
             qDebug() << "[MapDetector][YOLO] Could not load model:" << e.what();
-            qDebug() << "[MapDetector][YOLO] Place map_detection.onnx in the models/ folder next to the exe.";
+            qDebug() << "[MapDetector][YOLO] Place map_detection.onnx in the model/ folder next to the exe.";
             failed = true;
             return "";
         }
@@ -93,7 +93,6 @@ static QString detectMapWithYOLO(const std::string& videoPath,
         cap >> frame;
         if (frame.empty()) continue;
 
-        // Crop the minimap region (top-left of frame)
         int x = (int)(frame.cols * 0.024);
         int y = (int)(frame.rows * 0.083);
         int w = (int)(frame.cols * 0.160);
@@ -106,7 +105,6 @@ static QString detectMapWithYOLO(const std::string& videoPath,
 
         cv::Mat minimap = frame(cv::Rect(x, y, w, h));
 
-        // Prepare blob for YOLO
         cv::Mat blob;
         cv::dnn::blobFromImage(minimap, blob, 1.0 / 255.0,
             cv::Size(640, 640), cv::Scalar(), true, false);
@@ -116,12 +114,10 @@ static QString detectMapWithYOLO(const std::string& videoPath,
         net.forward(outputs, net.getUnconnectedOutLayersNames());
         if (outputs.empty() || outputs[0].empty()) continue;
 
-        // YOLOv8 output: [1, 14, 8400] -> transpose to [8400, 14]
         cv::Mat out = outputs[0];
         cv::Mat data(out.size[1], out.size[2], CV_32F, out.ptr<float>());
-        cv::transpose(data, data); // now [8400, 14]
+        cv::transpose(data, data);
 
-        // Accumulate best score per class across all detections
         for (int d = 0; d < data.rows; ++d) {
             float* row = data.ptr<float>(d);
             for (int c = 0; c < NUM_CLASSES; ++c) {
@@ -153,12 +149,22 @@ static QString detectMapWithYOLO(const std::string& videoPath,
     return bestMap;
 }
 
-// Layer 1: OCR - reads "CURRENT: HAVEN" from the broadcast overlay bar
+// Layer 1: OCR - reads "CURRENT: HAVEN" from the broadcast overlay bar.
+// Checks Tesseract in PATH first, then falls back to common install locations.
 static QString detectMapWithOCR(cv::VideoCapture& cap, double fps, double maxSeek) {
     QStringList knownMaps = {
         "abyss","ascent","bind","breeze","fracture",
         "haven","icebox","lotus","pearl","split","sunset"
     };
+
+    // Find Tesseract - works whether it's in PATH or installed to default location
+    QString tesseractExe = "tesseract";
+    for (const QString& path : {
+        QString("C:/Program Files/Tesseract-OCR/tesseract.exe"),
+        QString("C:/Program Files (x86)/Tesseract-OCR/tesseract.exe")
+        }) {
+        if (QFile::exists(path)) { tesseractExe = path; break; }
+    }
 
     for (double seekSec = 10.0; seekSec <= maxSeek; seekSec += 30.0) {
         cap.set(cv::CAP_PROP_POS_FRAMES, seekSec * fps);
@@ -183,7 +189,7 @@ static QString detectMapWithOCR(cv::VideoCapture& cap, double fps, double maxSee
         cv::imwrite(tempImage.toStdString(), upscaled);
 
         QProcess process;
-        process.start("tesseract", {
+        process.start(tesseractExe, {
             tempImage, tempText,
             "--psm", "7",
             "-c", "tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ: "

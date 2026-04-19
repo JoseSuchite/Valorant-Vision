@@ -14,6 +14,9 @@
 #include "../headers/videoplayer.h"
 #include "../headers/minimap.h"
 #include "../headers/mapdetector.h"
+#include "../headers/ocr.h"
+#include "../headers/webScraper.h"
+#include <thread>
 
 MainWindow::MainWindow() :
     QMainWindow() {
@@ -74,7 +77,72 @@ MainWindow::MainWindow() :
     logButton->hide();
     player->hide();
 
+    // Set up OCR detector (tessdata folder sits next to the exe)
+    ocrDetector = new OCRDetector("tessdata", "eng", this);
+
+    // Pre-load all team abbreviations from VLR.gg ranking pages so OCR can
+    // recognise any pro team, not just the hardcoded fallback list.
+    std::thread([this]() {
+        std::vector<std::string> abbrevs = TextDetection::scrapeAllTeamAbbreviations();
+        if (!abbrevs.empty()) {
+            QMetaObject::invokeMethod(ocrDetector, [this, abbrevs]() {
+                ocrDetector->setTeamNames(abbrevs);
+            }, Qt::QueuedConnection);
+            QMetaObject::invokeMethod(logBar, [this, abbrevs]() {
+                logBar->addLog(QString("Loaded %1 team names from VLR.gg").arg(abbrevs.size()));
+            }, Qt::QueuedConnection);
+        }
+    }).detach();
+    connect(ocrDetector, &OCRDetector::ocrLog,
+            logBar, &LogBar::addLog);
+    connect(ocrDetector, &OCRDetector::teamsDetected,
+            this, &MainWindow::onTeamsDetected);
+    connect(ocrDetector, &OCRDetector::killDetected,
+            logBar, &LogBar::addLog);
+    connect(ocrDetector, &OCRDetector::scoresChanged,
+            this, &MainWindow::onScoresChanged);
+
+    // Sync OCR to video playback state and position
+    connect(player, &VideoPlayer::videoPlaying,
+            ocrDetector, &OCRDetector::onVideoPlaying);
+    connect(player, &VideoPlayer::videoPaused,
+            ocrDetector, &OCRDetector::onVideoPaused);
+    connect(player, &VideoPlayer::videoPositionChanged,
+            ocrDetector, &OCRDetector::onVideoPositionChanged);
+
     this->show();
+}
+
+void MainWindow::onTeamsDetected(QString left, QString right)
+{
+    logBar->addLog("Scraping roster for " + left + " vs " + right + "...");
+
+    std::string a = left.toStdString();
+    std::string b = right.toStdString();
+    std::thread([this, a, b]() {
+        bool ok = TextDetection::prepareForMatch(a, b);
+        if (!ok) return;
+
+        // Build name->team pairs for OCRDetector
+        std::vector<std::pair<std::string,std::string>> records;
+        for (const auto& p : TextDetection::getPlayers())
+            records.emplace_back(p.name, p.team);
+
+        QMetaObject::invokeMethod(ocrDetector, [this, records]() {
+            ocrDetector->setPlayerRecords(records);
+        }, Qt::QueuedConnection);
+
+        QMetaObject::invokeMethod(logBar, [this, records]() {
+            logBar->addLog(QString("Roster loaded: %1 players").arg(records.size()));
+        }, Qt::QueuedConnection);
+    }).detach();
+}
+
+void MainWindow::onScoresChanged(QString leftTeam, int leftScore, QString rightTeam, int rightScore)
+{
+    logBar->addLog(QString("[Score] %1 %2 - %3 %4")
+                   .arg(leftTeam).arg(leftScore)
+                   .arg(rightScore).arg(rightTeam));
 }
 
 void MainWindow::openAndPlayVideoOnClick() {
@@ -105,6 +173,7 @@ void MainWindow::openAndPlayVideoOnClick() {
     logButton->show();
     player->show();
     player->displayVideo(source);
+    ocrDetector->startVideo(source);
     logBar->addLog("Video Loaded.");
 }
 
