@@ -21,6 +21,7 @@ public:
     static const std::vector<PlayerRecord>& getPlayers();
 
     // Cascade steps functions
+    static std::vector<std::string> scrapeAllTeamAbbreviations();
     static bool scrapeTeamsByAbbreviation(const std::string& teamA, const std::string& teamB);
     static void scrapePlayers();
 
