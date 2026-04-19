@@ -41,6 +41,7 @@ if __name__ == "__main__":
     print("Creating COCO file...")
     generator.save_coco(is_train=False)
     print("COCO file created")
+    generator.output_id_to_name_mapping()
     print("Finished :)")
 
 
