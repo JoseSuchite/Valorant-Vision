@@ -15,9 +15,9 @@ ModelWrapper::~ModelWrapper() {
 void ModelWrapper::loop(std::string fileName) {
 
 	const float LEFT_SIDE = 0.024;
-	const float RIGHT_SIDE = 0.235;
+	const float RIGHT_SIDE = 0.24;
 	const float TOP_SIDE = 0.04;
-	const float BOTTOM_SIDE = 0.42;
+	const float BOTTOM_SIDE = 0.43;
 
 	std::cout << "Starting frame processing" << fileName << std::endl;
 
