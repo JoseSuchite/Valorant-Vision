@@ -26,7 +26,7 @@ class ImageGenerator:
         self.agent_icon_path = agent_icon_path
         self.map_layout_path = minimap_path
         self.map_resize_factor = map_resize_factor
-        self.agent_resize_factor = (int(map_resize_factor[0] * 0.10), int(map_resize_factor[1] * 0.10)) 
+        self.agent_resize_factor = (int(map_resize_factor[0] * 0.08), int(map_resize_factor[1] * 0.08)) 
         self.misc_icon_path = misc_icon_path
 
         self.agent_icons = []
@@ -96,7 +96,7 @@ class ImageGenerator:
             agent_icon, inner_r, crop_pad = self.square_to_circle_with_border(image=agent_icon)
             agent_icon = self.rotate_image_randomly(agent_icon, angle_range=(-5, 5))
             agent_icon = self.skew_image(agent_icon, skew_angle_deg_x=random.randint(-5, 5), skew_angle_deg_y=random.randint(-5, 5))
-            agent_icon = self.zero_out_random_quarter(agent_icon) if random.random() < 0.4 else agent_icon # We cut out a random quarter of the image to simulate it being covered up. Feel free to reduce if it's too extreme
+            agent_icon = self.zero_out_random_angle(agent_icon) if random.random() < 0.4 else agent_icon # We cut out a random portion of the image to simulate it being covered up. Feel free to reduce if it's too extreme
 
             # Get dimensions of the minimap and agent icon
             minimap_height, minimap_width, _ = minimap.shape
@@ -453,9 +453,21 @@ class ImageGenerator:
         image[mask] = 0
         return image
 
-    def zero_out_random_quarter(self, image):
+    def zero_out_random_angle(self, image):
 
-        h, w, c = image.shape
+        start_angle = random.randint(0, 360)
+        angle_difference = random.randint(0, 270)
+        end_angle = start_angle + angle_difference
+
+        h, w, _ = image.shape
+        mask = np.zeros((h, w), dtype=np.uint8)
+        cv2.ellipse(mask, (h//2, w//2), (h//2, w//2), 0, start_angle, end_angle, 255, -1)
+        mask = ~mask
+
+        image = cv2.bitwise_and(image, image, mask=mask)
+
+        return image
+
         num = random.randint(1, 4)
 
         if num == 1:
@@ -538,6 +550,17 @@ class ImageGenerator:
         self.annotation_id = 0
         self.image_id = 0
 
+    def output_id_to_name_mapping(self):
+
+        output = []
+        for name, class_id in self.class_ids.items():
+            output += [{"id": class_id, "name": name}]
+
+        path = "id_to_name.json"
+        with open(path, "w") as f:
+            json.dump(output, f, indent=4, default=int)
+
+
     # Takes in the name of the files you want to create and outputs an image and txt file with that name
     def generate_data(self, data_name, is_train=True):
 
@@ -546,11 +569,11 @@ class ImageGenerator:
         minimap = self.draw_misc(minimap, num_misc_to_draw=random.randint(10, 16))
         minimap, positions = self.draw_agents(minimap, num_agents_to_draw=random.randint(16, 40))
         minimap = self.add_gaussian_noise(minimap, sigma_range=(0.0, 0.01))
-        minimap = self.scale_artifact(minimap, scale_range=(0.8, 1.0))
-        minimap = self.apply_jpeg_compression(minimap, quality_range=(80, 100))
+        minimap = self.scale_artifact(minimap, scale_range=(0.5, 1.0))
+        minimap = self.apply_jpeg_compression(minimap, quality_range=(50, 100))
 
         #minimap = self.make_random_invisible(minimap, percent_invisible=0.01)
-        #minimap = cv2.GaussianBlur(minimap, (3, 3), 0) if random.random() < 0.5 else minimap
+        minimap = cv2.GaussianBlur(minimap, (3, 3), 0) if random.random() < 0.5 else minimap
 
         # The next two could be helpful, but you'd need to recalculate the bounding boxes and I don't want to
         #minimap = self.skew_image(minimap, skew_angle_deg_x=random.randint(-10, 10), skew_angle_deg_y=random.randint(-10, 10))

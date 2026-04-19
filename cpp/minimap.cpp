@@ -27,21 +27,17 @@ Minimap::Minimap(QWidget *parentAddress)
     std::ifstream f("id_to_name.json");
     // was crashing when it couldn't find the file, so added this check and warning message
     if (!f.is_open()) {
-<<<<<<< HEAD
         qWarning("Minimap: could not open id_to_name.json — check working directory");
-=======
-        qWarning("Minimap: could not open id_to_name.json â€” check working directory");
->>>>>>> 9a4bdb20a0f49958b16e022deb754a6b7435a051
         return;
     }
     nlohmann::json idToNameJSON = nlohmann::json::parse(f);
     f.close();
 
-    int numClasses = idToNameJSON["categories"].size();
+    int numClasses = idToNameJSON.size();
     for (int i = 0; i < numClasses; i++) {
-        idToName.push_back(idToNameJSON["categories"][i]["name"]);
+        idToName.push_back(idToNameJSON[i]["name"]);
     }
-    agentIcons.push_back(cv::Mat());
+    agentIcons.push_back(cv::Mat()); //Pushing back an empty image since IDs start at 1, not 0 (should change this later...)
     for (int i = 0; i < numClasses; i++) {
         cv::Mat img = cv::imread("agent_icons/" + idToName[i] + ".png", cv::IMREAD_UNCHANGED);
         if (img.empty()) {
@@ -50,11 +46,7 @@ Minimap::Minimap(QWidget *parentAddress)
             continue;
         }
         cv::Mat resizedImg;
-<<<<<<< HEAD
-        cv::resize(img, resizedImg, cv::Size(20, 20)); //This isn't *really* hardcoding, as this will get layered onto the image when it's resized to match the model's predictions
-=======
-        cv::resize(img, resizedImg, cv::Size(20, 20));
->>>>>>> 9a4bdb20a0f49958b16e022deb754a6b7435a051
+        cv::resize(img, resizedImg, cv::Size(16, 16)); //This isn't *really* hardcoding, as this will get layered onto the image when it's resized to match the model's predictions
         agentIcons.push_back(resizedImg);
     }
 }
@@ -144,14 +136,18 @@ void Minimap::redrawAgents(Eigen::MatrixXf frameData) {
 
         bgr_foreground.copyTo(ROI, alpha);
 
-        cv::String text = std::to_string(trackID);
-
-        cv::putText(resizedImg, text, cv::Point(xmin, ymin - 10), cv::FONT_HERSHEY_SIMPLEX, 0.4, cv::Scalar(0, 0, 0), 3, cv::LINE_AA);
-        cv::putText(resizedImg, text, cv::Point(xmin, ymin - 10), cv::FONT_HERSHEY_SIMPLEX, 0.4, cv::Scalar(0, 255, 0), 2, cv::LINE_AA);
+       // cv::String text = std::to_string(trackID);
+       // cv::putText(resizedImg, text, cv::Point(xmin, ymin - 10), cv::FONT_HERSHEY_SIMPLEX, 0.4, cv::Scalar(0, 0, 0), 3, cv::LINE_AA);
+       // cv::putText(resizedImg, text, cv::Point(xmin, ymin - 10), cv::FONT_HERSHEY_SIMPLEX, 0.4, cv::Scalar(0, 255, 0), 2, cv::LINE_AA);
     }
 
     // TODO: Need to update so that it goes to whatever size the pixmap was at before instead of staying at the model's prediction size...
     QPixmap newPixmap = cvMatToQPixmap(resizedImg);
+    if (!pixmap.isNull()) {
+        newPixmap = newPixmap.scaled(minimap_wid->size(),
+            Qt::KeepAspectRatio,
+            Qt::SmoothTransformation);
+    }
 
     if (newPixmap.toImage() != pixmap.toImage()) {
         pixmap = newPixmap;

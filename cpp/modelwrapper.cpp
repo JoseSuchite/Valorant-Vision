@@ -15,9 +15,9 @@ ModelWrapper::~ModelWrapper() {
 void ModelWrapper::loop(std::string fileName) {
 
 	const float LEFT_SIDE = 0.024;
-	const float RIGHT_SIDE = 0.235;
+	const float RIGHT_SIDE = 0.24;
 	const float TOP_SIDE = 0.04;
-	const float BOTTOM_SIDE = 0.42;
+	const float BOTTOM_SIDE = 0.43;
 
 	std::cout << "Starting frame processing" << fileName << std::endl;
 
@@ -66,7 +66,7 @@ void ModelWrapper::startProcessingLoop(const std::string fileName, const int RUN
 
 	EVERY_N_FRAMES = RUN_EVERY_N_FRAMES;
 
-	if (model == nullptr) {
+	if (model == nullptr) { //TODO: Change this back to being done in the constructor. I don't know why someone changed it to be here. The constructor should be responsible for initializaing the model...
 		const int ROWS = 384;
 		const int COLS = 384;
 		try {
