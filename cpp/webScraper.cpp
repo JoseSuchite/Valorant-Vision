@@ -44,16 +44,12 @@ namespace {
         return totalSize;
     }
 
-    // All file I/O resolves relative to executable location
-    // Goes up three levels: Qt/ -> build/ -> out/ -> project root
+    // Resolves to the executable's directory so paths work regardless of working directory
+	// Inject PROJECT_ROOT via CMakeLists
     std::filesystem::path dataDir()
-    {
-        return std::filesystem::current_path()
-            .parent_path()
-            .parent_path()
-            .parent_path()
-            / "data";
-    }
+	{
+    	return std::filesystem::path(PROJECT_ROOT) / "data";
+	}
 
 	// Full path to players.txt
     std::filesystem::path playersFilePath()
