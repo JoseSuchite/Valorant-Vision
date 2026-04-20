@@ -27,20 +27,25 @@ MainWindow::MainWindow() :
     mainVerticalLayout = new QVBoxLayout(centralWidget);
 
     logBar = new LogBar(this);
+    logBar->setObjectName("rightDockItem");
 
     addDockWidget(Qt::RightDockWidgetArea, logBar);
     minimap_wid = new Minimap(this);
+    minimap_wid->setObjectName("rightDockItem");
 
     addDockWidget(Qt::RightDockWidgetArea, minimap_wid);
     minimap_wid->loadImage("map_layouts/Ascent_layout.png");
 
     player = new VideoPlayer(centralWidget);
+    player->setObjectName("mainVideoPlayer");
+    player->setAttribute(Qt::WA_StyledBackground);
     controlPanel = new QHBoxLayout(centralWidget);
     chooseFileButton = new QPushButton("Select Video", centralWidget);
 
     QPixmap pixmap(":/images/logo.png");
     picLabel = new QLabel();
     picLabel->setPixmap(pixmap);
+    picLabel->setAlignment(Qt::AlignCenter);
 
     pauseButton = new QPushButton("Pause/Play", centralWidget);
 

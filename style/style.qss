@@ -36,6 +36,32 @@ QPushButton:hover{
     padding: 6px;
 }
 
-QVideoWidget{
-    border-color: red;
+QDockWidget#rightDockItem::title {
+    background: rgb(14, 14, 14);
+    text-align: center;
+    padding: 4px;
+    color: white;
+    border-color: rgb(7, 187, 171);
+    border-style: outset;
+    border-width: 2px;
+    border-radius: 2px;
+}
+
+QMainWindow QTabBar::tab {
+    background: rgb(14, 14, 14);
+    color: #aaa;
+    padding: 5px 10px;
+}
+
+QMainWindow QTabBar::tab:selected {
+    background: rgb(7, 187, 171);
+    border-color: rgb(14, 14, 14);
+    color: black;
+    border-style: outset;
+    border-width: 2px;
+    border-radius: 2px;
+}
+
+#mainVideoPlayer {
+    background-color: rgb(14, 14, 14); 
 }
