@@ -215,7 +215,7 @@ void NeuralNetwork::resetTracker(const int FPS) {
                                             80, //Number of classes. It's fine to leave for now, but might cause issues if it goes over 80
                                             "iou",
                                             false,
-                                            0.5f,
+                                            0.3f,
                                             0.45f,
                                             0.8f,
                                             80 * (30.0 / FPS),
