@@ -9,6 +9,10 @@
 #include <QFileInfo>
 #include <QPixmap>
 #include <QLabel>
+#include <QDialog>
+#include <QLineEdit>
+#include <QDialogButtonBox>
+#include <QVBoxLayout>
 #include "../headers/logbar.h"
 #include "../headers/mainwindow.h"
 #include "../headers/videoplayer.h"
@@ -27,25 +31,20 @@ MainWindow::MainWindow() :
     mainVerticalLayout = new QVBoxLayout(centralWidget);
 
     logBar = new LogBar(this);
-    logBar->setObjectName("rightDockItem");
 
     addDockWidget(Qt::RightDockWidgetArea, logBar);
     minimap_wid = new Minimap(this);
-    minimap_wid->setObjectName("rightDockItem");
 
     addDockWidget(Qt::RightDockWidgetArea, minimap_wid);
     minimap_wid->loadImage("map_layouts/Ascent_layout.png");
 
     player = new VideoPlayer(centralWidget);
-    player->setObjectName("mainVideoPlayer");
-    player->setAttribute(Qt::WA_StyledBackground);
     controlPanel = new QHBoxLayout(centralWidget);
     chooseFileButton = new QPushButton("Select Video", centralWidget);
 
     QPixmap pixmap(":/images/logo.png");
     picLabel = new QLabel();
     picLabel->setPixmap(pixmap);
-    picLabel->setAlignment(Qt::AlignCenter);
 
     pauseButton = new QPushButton("Pause/Play", centralWidget);
 
@@ -84,22 +83,11 @@ MainWindow::MainWindow() :
 
     // Set up OCR detector (tessdata folder sits next to the exe)
     ocrDetector = new OCRDetector("tessdata", "eng", this);
-
-    // Pre-load all team abbreviations from VLR.gg ranking pages so OCR can
-    // recognise any pro team, not just the hardcoded fallback list.
-    std::thread([this]() {
-        std::vector<std::string> abbrevs = WebScraper::scrapeAllTeamAbbreviations();
-        if (!abbrevs.empty()) {
-            QMetaObject::invokeMethod(ocrDetector, [this, abbrevs]() {
-                ocrDetector->setTeamNames(abbrevs);
-            }, Qt::QueuedConnection);
-            QMetaObject::invokeMethod(logBar, [this, abbrevs]() {
-                logBar->addLog(QString("Loaded %1 team names from VLR.gg").arg(abbrevs.size()));
-            }, Qt::QueuedConnection);
-        }
-    }).detach();
+    
     connect(ocrDetector, &OCRDetector::ocrLog,
             logBar, &LogBar::addLog);
+    connect(ocrDetector, &OCRDetector::teamsProposed,
+            this, &MainWindow::onTeamsProposed);
     connect(ocrDetector, &OCRDetector::teamsDetected,
             this, &MainWindow::onTeamsDetected);
     connect(ocrDetector, &OCRDetector::killDetected,
@@ -120,27 +108,67 @@ MainWindow::MainWindow() :
 
 void MainWindow::onTeamsDetected(QString left, QString right)
 {
-    logBar->addLog("Scraping roster for " + left + " vs " + right + "...");
+    logBar->addLog(QString("Scraping VLR.gg for %1 / %2...").arg(left, right));
+    
+    std::thread([this, l = left.toStdString(), r = right.toStdString()]() {
+        bool ok = WebScraper::prepareForMatch(l, r);
 
-    std::string a = left.toStdString();
-    std::string b = right.toStdString();
-    std::thread([this, a, b]() {
-        bool ok = WebScraper::prepareForMatch(a, b);
-        if (!ok) return;
+        // Fallback to cached file if the scrape struck out.
+        if (!ok && WebScraper::fileExists())
+            WebScraper::loadPlayersFromFile();
 
-        // Build name->team pairs for OCRDetector
         std::vector<std::pair<std::string,std::string>> records;
         for (const auto& p : WebScraper::getPlayers())
             records.emplace_back(p.name, p.team);
 
-        QMetaObject::invokeMethod(ocrDetector, [this, records]() {
+        QString source = ok ? "VLR.gg" : "cached file";
+        QMetaObject::invokeMethod(this, [this, records, source]() {
             ocrDetector->setPlayerRecords(records);
-        }, Qt::QueuedConnection);
-
-        QMetaObject::invokeMethod(logBar, [this, records]() {
-            logBar->addLog(QString("Roster loaded: %1 players").arg(records.size()));
+            logBar->addLog(QString("Roster loaded from %1: %2 players")
+                           .arg(source).arg(records.size()));
         }, Qt::QueuedConnection);
     }).detach();
+}
+
+void MainWindow::onTeamsProposed(QString left, QString right)
+{
+    // Pause playback so the user has time to read/edit the detected names.
+    player->pause();
+
+    QDialog dlg(this);
+    dlg.setWindowTitle("Confirm Teams");
+
+    QVBoxLayout* layout = new QVBoxLayout(&dlg);
+    layout->addWidget(new QLabel("Confirm or edit the detected team names:", &dlg));
+
+    layout->addWidget(new QLabel("Left:", &dlg));
+    QLineEdit* leftEdit = new QLineEdit(left, &dlg);
+    layout->addWidget(leftEdit);
+
+    layout->addWidget(new QLabel("Right:", &dlg));
+    QLineEdit* rightEdit = new QLineEdit(right, &dlg);
+    layout->addWidget(rightEdit);
+
+    QDialogButtonBox* box = new QDialogButtonBox(
+        QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dlg);
+    connect(box, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
+    connect(box, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
+    layout->addWidget(box);
+
+    if (dlg.exec() == QDialog::Accepted) {
+        QString l = leftEdit->text().trimmed();
+        QString r = rightEdit->text().trimmed();
+        if (l.isEmpty() || r.isEmpty()) {
+            ocrDetector->rejectTeams();
+            player->play();
+            return;
+        }
+        ocrDetector->confirmTeams(l, r);
+        player->play();
+    } else {
+        ocrDetector->rejectTeams();
+        player->play();
+    }
 }
 
 void MainWindow::onScoresChanged(QString leftTeam, int leftScore, QString rightTeam, int rightScore)

@@ -30,14 +30,12 @@ private:
     OCRDetector* ocrDetector;
 
     void openAndPlayVideoOnClick();
-
-    //Pauses or plays the video (depends on the state)
     void pauseOrPlayVideo();
-    //Resets the side bar to its original place
     void resetBar();
 
 private slots:
     void onTeamsDetected(QString left, QString right);
+    void onTeamsProposed(QString left, QString right);
     void onScoresChanged(QString leftTeam, int leftScore, QString rightTeam, int rightScore);
 
 public:

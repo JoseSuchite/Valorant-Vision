@@ -11,6 +11,7 @@
 #include <unordered_set>
 #include <unordered_map>
 #include <atomic>
+#include <mutex>
 #include <thread>
 
 struct KillEvent {
@@ -34,6 +35,9 @@ public:
 public slots:
     void startVideo(const std::string& videoPath);
     void reset();
+    // User accepted / rejected the proposed team names from the dialog
+    void confirmTeams(QString left, QString right);
+    void rejectTeams();
     // Sync slots wired to VideoPlayer signals
     void onVideoPlaying(qint64 positionMs);
     void onVideoPaused();
@@ -41,6 +45,9 @@ public slots:
 
 signals:
     void ocrLog(QString text);
+    // OCR detected team names - MainWindow shows a confirmation dialog
+    void teamsProposed(QString left, QString right);
+    // Fired only after the user has confirmed the names (roster scrape trigger)
     void teamsDetected(QString left, QString right);
     void killDetected(QString logLine);
     void scoresChanged(QString leftTeam, int leftScore, QString rightTeam, int rightScore);
@@ -62,6 +69,7 @@ private:
 
     std::vector<std::string> teamNames;
     bool teamDetected = false;
+    bool awaitingTeamConfirmation = false;
     std::string leftTeamName;
     std::string rightTeamName;
 
@@ -75,6 +83,9 @@ private:
     double capFps = 0.0;
     std::string lastRoundTimer;
     std::atomic_bool ocrBusy{false};
+    std::atomic_bool shuttingDown{false};
+    // Serializes tess access between the OCR worker thread and destructor cleanup
+    std::mutex tessMutex;
 
     std::string normalize(const std::string& s);
     int levenshtein_distance(const std::string& a, const std::string& b);

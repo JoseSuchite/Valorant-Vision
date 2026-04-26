@@ -1,4 +1,4 @@
-#include "minimap.h"
+#include "../headers/minimap.h"
 
 #include <nlohmann/json.hpp>
 
@@ -27,7 +27,7 @@ Minimap::Minimap(QWidget *parentAddress)
     std::ifstream f("id_to_name.json");
     // was crashing when it couldn't find the file, so added this check and warning message
     if (!f.is_open()) {
-        qWarning("Minimap: could not open id_to_name.json — check working directory");
+        qWarning("Minimap: could not open id_to_name.json ï¿½ check working directory");
         return;
     }
     nlohmann::json idToNameJSON = nlohmann::json::parse(f);

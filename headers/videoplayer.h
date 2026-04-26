@@ -37,6 +37,12 @@ public:
 	//Pauses or plays video (depends on state)
 	void pauseOrPlayVideo();
 
+	//Pauses playback unconditionally (used while dialogs are showing)
+	void pause();
+
+	//Starts playback unconditionally
+	void play();
+
 	//Sets volume for the player
 	void setVolume(float volume);
 

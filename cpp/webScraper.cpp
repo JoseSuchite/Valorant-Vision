@@ -6,6 +6,8 @@
 
 #include "../headers/WebScraper.h"
 
+#include <algorithm>
+#include <cctype>
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -19,6 +21,7 @@
 #include <curl/curl.h>
 
 #include <QApplication>
+#include <QCoreApplication>
 #include <QDialog>
 #include <QListWidget>
 #include <QPushButton>
@@ -44,11 +47,13 @@ namespace {
         return totalSize;
     }
 
-    // Resolves to the executable's directory so paths work regardless of working directory
-    // Inject PROJECT_ROOT via CMakeLists.txt 
+    // Resolves to "<exe-dir>/data" so the path is identical on every machine,
+    // regardless of where the project was built or what the current working
+    // directory is when the app launches.
     std::filesystem::path dataDir()
     {
-        return std::filesystem::path(PROJECT_ROOT) / "data";
+        return std::filesystem::path(
+            QCoreApplication::applicationDirPath().toStdString()) / "data";
     }
 
     // Full path to players.txt
@@ -251,17 +256,56 @@ std::vector<std::string> WebScraper::scrapeAllTeamAbbreviations()
     return result;
 }
 
-// Extracts team page URLs from the main teams listing page HTML and stores them in teamLinks
+// Extracts team page URLs from any VLR HTML (search results OR ranking pages)
+// and normalizes them to canonical https://www.vlr.gg/team/{ID} form.
+// VLR redirects bare /team/{ID} to the slug version, so the canonical form works.
 void WebScraper::extractTeams(const std::string& html)
 {
-    std::regex teamRegex(R"(/team/[0-9]+/[A-Za-z0-9\-]+)");
-    std::smatch match;
-    std::string remaining = html;
+    // Match the team ID from either /team/{ID}/slug (ranking pages) or
+    // /search/r/team/{ID}/idx (search results pages).
+    std::regex teamRegex(R"(/(?:search/r/)?team/([0-9]+)(?:/[A-Za-z0-9\-]*)?)");
+    auto begin = std::sregex_iterator(html.begin(), html.end(), teamRegex);
+    auto end   = std::sregex_iterator();
 
-    while (std::regex_search(remaining, match, teamRegex))
+    for (auto it = begin; it != end; ++it)
+        teamLinks.insert("https://www.vlr.gg/team/" + (*it)[1].str());
+}
+
+// Parses VLR search results into (canonical-team-url, displayed-title) pairs.
+// Used to pre-filter candidates before paying for a full team-page download.
+namespace {
+    struct SearchHit { std::string url; std::string title; bool inactive; };
+
+    std::vector<SearchHit> parseSearchHits(const std::string& html)
     {
-        teamLinks.insert("https://www.vlr.gg" + match[0].str());
-        remaining = match.suffix().str();
+        std::vector<SearchHit> hits;
+        std::regex re(
+            R"(<a href="/search/r/team/([0-9]+)/idx"[^>]*>[\s\S]*?<div class="search-item-title">([\s\S]*?)</div>)"
+        );
+        auto begin = std::sregex_iterator(html.begin(), html.end(), re);
+        auto end   = std::sregex_iterator();
+        for (auto it = begin; it != end; ++it) {
+            std::string id    = (*it)[1].str();
+            std::string title = (*it)[2].str();
+
+            bool inactive = title.find("inactive") != std::string::npos;
+
+            // Strip nested tags and trim
+            title = std::regex_replace(title, std::regex(R"(<[^>]+>)"), "");
+            auto s = title.find_first_not_of(" \t\r\n");
+            auto e = title.find_last_not_of(" \t\r\n");
+            if (s == std::string::npos) continue;
+            title = title.substr(s, e - s + 1);
+
+            hits.push_back({ "https://www.vlr.gg/team/" + id, title, inactive });
+        }
+        return hits;
+    }
+
+    std::string toLower(std::string s)
+    {
+        for (auto& c : s) c = (char)std::tolower((unsigned char)c);
+        return s;
     }
 }
 
@@ -625,22 +669,43 @@ bool WebScraper::prepareForMatch(const std::string& teamA, const std::string& te
             if (searchHTML.empty())
                 return false;
 
-            teamLinks.clear();
-            extractTeams(searchHTML);
+            // Rank candidates: non-inactive first, otherwise trust VLR's search ranking.
+            // We deliberately do NOT prioritize exact title matches: short titles like
+            // "PRX" or "SEN" are usually secondary/empty teams, while the canonical org
+            // (Paper Rex, Sentinels) ranks higher in VLR's natural search order.
+            auto hits = parseSearchHits(searchHTML);
+            std::string wantLower = toLower(team);
+            std::stable_sort(hits.begin(), hits.end(),
+                [&](const SearchHit& a, const SearchHit& b) {
+                    if (a.inactive != b.inactive) return !a.inactive;
+                    return false;
+                });
 
-            for (const auto& url : teamLinks)
-            {
-                std::string html = downloadPage(url);
+            const int kMaxFetches = 8;
+            int fetched = 0;
+            for (const auto& hit : hits) {
+                if (fetched++ >= kMaxFetches) break;
+
+                std::string html = downloadPage(hit.url);
                 if (html.empty()) continue;
 
                 std::string tag = extractTeamTag(html);
+                if (toLower(tag) != wantLower) continue;
 
-                if (tag == team)
-                {
-                    std::cout << "Found team: " << tag << "\n";
-                    extractPlayers(html);
-                    return true;
+                // Tag matches - try to extract roster. If 0 players come back,
+                // it's a tag collision with a stub/empty team; keep looking.
+                size_t before = proPlayers.size();
+                extractPlayers(html);
+                size_t added  = proPlayers.size() - before;
+                if (added == 0) {
+                    std::cout << "Tag " << tag << " matched at " << hit.url
+                              << " but roster was empty — trying next candidate\n";
+                    continue;
                 }
+
+                std::cout << "Found team: " << tag << " at " << hit.url
+                          << " (" << added << " players)\n";
+                return true;
             }
 
             return false;
@@ -652,55 +717,42 @@ bool WebScraper::prepareForMatch(const std::string& teamA, const std::string& te
     std::cout << "Team A: " << (foundA ? "GOOD" : "MISSING") << "\n";
     std::cout << "Team B: " << (foundB ? "GOOD" : "MISSING") << "\n";
 
-    bool bothFound = foundA && foundB;
+    // Per-team file fallback -if a team didn't scrape but its players are cached
+    // in players.txt from a previous run, pull just that team's records in.
+    // Avoids the "only one team scraped" failure mode where the other team is silently missing.
+    auto fillFromCache = [](const std::string& wanted) -> int {
+        if (wanted.empty() || !fileExists()) return 0;
+        std::ifstream f(playersFilePath());
+        std::string line;
+        std::string wantLower = toLower(wanted);
+        int added = 0;
+        while (std::getline(f, line)) {
+            if (line.empty()) continue;
+            auto sp = line.find(' ');
+            if (sp == std::string::npos) continue;
+            std::string team = line.substr(0, sp);
+            if (toLower(team) != wantLower) continue;
+            PlayerRecord rec;
+            rec.team = team;
+            rec.name = line.substr(sp + 1);
+            proPlayers.push_back(rec);
+            playerSet.insert(rec.name);
+            ++added;
+        }
+        return added;
+    };
+
+    if (!foundA) {
+        int n = fillFromCache(teamA);
+        if (n > 0) std::cout << "Team A " << teamA << ": filled " << n << " players from cache\n";
+    }
+    if (!foundB) {
+        int n = fillFromCache(teamB);
+        if (n > 0) std::cout << "Team B " << teamB << ": filled " << n << " players from cache\n";
+    }
 
     if (!proPlayers.empty())
         savePlayersToFile();
-
-    // If we couldn't find one or both teams by their abbreviations and there's no existing players.txt file,
-    // prompt the user to select regions to scrape
-    if (!bothFound)
-    {
-        // Output message to console to explain the situation to the user before showing the dialog
-        std::cout << "One or more teams missing: prompting region selection...\n";
-        std::cout << "Region Selection clears any current team, please make sure to select both regions that the teams are from \n";
-
-        std::vector<std::string> regions = promptRegionSelection();
-
-        // If the user selected regions, scrape all teams from those regions and then scrape players from those teams
-        if (!regions.empty())
-        {
-
-            teamLinks.clear();
-
-            for (const auto& url : regions)
-            {
-                std::string html = downloadPage(url);
-                if (!html.empty())
-                    extractTeams(html);
-            }
-
-            std::cout << "Team pages found: " << teamLinks.size() << "\n";
-
-            for (const auto& url : teamLinks)
-            {
-                std::string html = downloadPage(url);
-                if (!html.empty())
-                    extractPlayers(html);
-            }
-
-            std::cout << "Players after fallback: " << proPlayers.size() << "\n";
-
-            if (!proPlayers.empty())
-                savePlayersToFile();
-        }
-
-        else
-        {
-            // If the user skipped the region selection or didn't select any regions, fall back to scraping all teams from all regions
-            scrapePlayers();
-        }
-    }
 
     return !proPlayers.empty();
 }

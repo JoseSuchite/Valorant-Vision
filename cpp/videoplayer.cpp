@@ -82,6 +82,14 @@ void VideoPlayer::pauseOrPlayVideo() {
 	}
 }
 
+void VideoPlayer::pause() {
+	player->pause();
+}
+
+void VideoPlayer::play() {
+	player->play();
+}
+
 void VideoPlayer::setVolume(float volume) {
     audioOutput->setVolume(volume);
 }

@@ -42,7 +42,27 @@ OCRDetector::OCRDetector(const std::string& tessdataPath,
         tess.SetVariable("debug_file", "NUL");
     }
 
-    teamNames = { "NRG","PRX","LOUD","SEN","EG","TL","FNC","T1","G2","KRU","LEV" };
+    teamNames = {
+    "ENT", "FNC", "BBL", "EF", "FUT", "GX", "M8", "TL", "VIT", "TLA",
+
+    "NRG", "G2", "100T", "ENVY", "SEN", "FLY", "LEV", "C9", "NBG", "SAD",
+
+    "TS", "INTZ", "FUR", "MIBR", "2GE", "MIBRA", "ELV", "TBK", "TLBR", "PEEK",
+
+    "PRX", "SHR", "FS", "RRQ", "FU", "BOOM", "MOT", "555", "GE", "NKT",
+
+    "NSR", "T1", "DRX", "SLT", "GEN", "ONS", "IAM", "DPLUS", "GGA", "STR", "NS",
+
+    "XLG", "EDG", "BLG", "AG", "TYL", "JDG", "RA", "DRG", "TE", "CCG",
+
+    "CGZ", "DFM", "VL", "RO", "QTD", "FNL", "INS", "SCZ", "IGZ", "DLT",
+
+    "KRU", "SHN", "MK", "BER", "KRUS", "LEVA", "MIX", "KLG", "9Z", "FRE",
+
+    "LYON", "SA", "CON", "TEZ", "DCT", "FUEGO", "CHIV", "LAZ", "AB3", "ATL",
+
+    "BNK", "CD", "EKING"
+    };
 
     frameTimer = new QTimer(this);
     frameTimer->setInterval(FRAME_INTERVAL_MS);
@@ -51,9 +71,22 @@ OCRDetector::OCRDetector(const std::string& tessdataPath,
 
 OCRDetector::~OCRDetector()
 {
+    // Tell the in-flight worker (if any) to bail before it touches tess.
+    shuttingDown.store(true);
     frameTimer->stop();
+
+    // Detached OCR thread may still be running. Spin briefly until it releases
+    // the busy flag, otherwise tess.End() races with SetImage/GetUTF8Text and crashes.
+    for (int i = 0; i < 200 && ocrBusy.load(); ++i)
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+
     cap.release();
-    if (tessOk) tess.End();
+
+    std::lock_guard<std::mutex> lk(tessMutex);
+    if (tessOk) {
+        tess.End();
+        tessOk = false;
+    }
 }
 
 // Public control
@@ -63,6 +96,7 @@ void OCRDetector::startVideo(const std::string& videoPath)
     cap.release();
 
     teamDetected = false;
+    awaitingTeamConfirmation = false;
     seenKills.clear();
     lastLeftScore  = -1;
     lastRightScore = -1;
@@ -84,9 +118,27 @@ void OCRDetector::reset()
     frameTimer->stop();
     cap.release();
     teamDetected = false;
+    awaitingTeamConfirmation = false;
     seenKills.clear();
     lastLeftScore  = -1;
     lastRightScore = -1;
+}
+
+void OCRDetector::confirmTeams(QString left, QString right)
+{
+    leftTeamName  = left.toStdString();
+    rightTeamName = right.toStdString();
+    teamDetected = true;
+    awaitingTeamConfirmation = false;
+    emit ocrLog(QString("Teams confirmed: %1 vs %2").arg(left).arg(right));
+    emit teamsDetected(left, right);
+}
+
+void OCRDetector::rejectTeams()
+{
+    // Allow the next frame's detection to propose fresh names
+    awaitingTeamConfirmation = false;
+    emit ocrLog("Team confirmation cancelled — detection will retry.");
 }
 
 void OCRDetector::setTeamNames(const std::vector<std::string>& names)
@@ -122,9 +174,7 @@ void OCRDetector::onVideoPositionChanged(qint64 positionMs)
     currentVideoPos = positionMs;
 }
 
-// ---------------------------------------------------------------------------
 // Timer slot
-// ---------------------------------------------------------------------------
 void OCRDetector::processNextFrame()
 {
     if (!cap.isOpened()) return;
@@ -153,7 +203,8 @@ void OCRDetector::processNextFrame()
     // ocrBusy prevents a second step until this one finishes.
     ocrBusy.store(true);
     std::thread([this, f = std::move(frame)]() mutable {
-        processFrame(f);
+        if (!shuttingDown.load())
+            processFrame(f);
         ocrBusy.store(false);
     }).detach();
 }
@@ -260,33 +311,70 @@ KillEvent OCRDetector::resolve_killfeed_whole(const std::string& raw,
                                               bool player_list_valid)
 {
     KillEvent evt;
-    auto tokens = extract_tokens(raw);
-    if (tokens.empty()) return evt;
+    std::string norm = normalize(raw);
+    if (norm.empty()) return evt;
 
     if (!player_list_valid) {
+        auto tokens = extract_tokens(raw);
         if (tokens.size() >= 2) { evt.killer = tokens[0]; evt.victim = tokens[1]; }
         return evt;
     }
 
-    struct Match { std::string token, player; int dist; };
-    std::vector<Match> good;
+    struct Found { std::string player; int pos; int len; int dist; };
+    std::vector<Found> found;
 
-    for (const auto& t : tokens) {
-        std::string norm_t = normalize(t);
-        int best = 9999;
-        std::string bestp;
-        for (const auto& p : players) {
-            int d = levenshtein_distance(norm_t, normalize(p));
-            if (d < best) { best = d; bestp = p; }
+    for (const auto& p : players) {
+        std::string np = normalize(p);
+        if (np.empty()) continue;
+
+        int threshold;
+        if (np.size() <= 2)      threshold = 0;
+        else if (np.size() <= 5) threshold = 1;
+        else                     threshold = 2;
+
+        int minLen = std::max(1, (int)np.size() - 1);
+        int maxLen = (int)np.size() + 1;
+        int N = (int)norm.size();
+        if (minLen > N) continue;
+
+        int bestDist = 9999, bestPos = -1, bestLen = (int)np.size();
+        for (int start = 0; start + minLen <= N; ++start) {
+            for (int wl = minLen; wl <= maxLen && start + wl <= N; ++wl) {
+                int d = levenshtein_distance(norm.substr(start, wl), np);
+                if (d < bestDist) { bestDist = d; bestPos = start; bestLen = wl; }
+                if (bestDist == 0) break;
+            }
+            if (bestDist == 0) break;
         }
-        if (best <= 3)
-            good.push_back({ t, bestp, best });
+
+        if (bestDist <= threshold && bestPos >= 0)
+            found.push_back({ p, bestPos, bestLen, bestDist });
     }
 
-    if (good.size() != 2) return evt;
+    // Greedy dedup: prefer lower distance, drop overlapping hits.
+    std::sort(found.begin(), found.end(),
+              [](const Found& a, const Found& b) { return a.dist < b.dist; });
 
-    evt.killer = good[0].player;
-    evt.victim = good[1].player;
+    std::vector<Found> kept;
+    for (const auto& f : found) {
+        bool overlap = false;
+        for (const auto& k : kept) {
+            int a1 = f.pos, a2 = f.pos + f.len;
+            int b1 = k.pos, b2 = k.pos + k.len;
+            if (a1 < b2 && b1 < a2) { overlap = true; break; }
+        }
+        if (!overlap) kept.push_back(f);
+        if (kept.size() == 2) break;
+    }
+
+    if (kept.size() != 2) return evt;
+
+    // Killfeed layout: killer on left, victim on right.
+    std::sort(kept.begin(), kept.end(),
+              [](const Found& a, const Found& b) { return a.pos < b.pos; });
+
+    evt.killer = kept.front().player;
+    evt.victim = kept.back().player;
     if (evt.killer == evt.victim) { evt.killer.clear(); evt.victim.clear(); }
     return evt;
 }
@@ -295,11 +383,16 @@ void OCRDetector::processFrame(const cv::Mat& frame)
 {
     if (frame.empty() || !tessOk) return;
 
+    // Hold the tess mutex for the whole frame so the destructor can't End()
+    // tesseract out from under SetImage/GetUTF8Text mid-call.
+    std::lock_guard<std::mutex> lk(tessMutex);
+    if (!tessOk || shuttingDown.load()) return;
+
     double now = QDateTime::currentMSecsSinceEpoch() / 1000.0;
     int img_w = frame.cols, img_h = frame.rows;
 
-    // --- TEAM DETECTION (once) ---
-    if (!teamDetected) {
+    // --- TEAM DETECTION (propose to user, confirmed by dialog) ---
+    if (!teamDetected && !awaitingTeamConfirmation) {
         cv::Rect lr = rel_to_rect(TEAM_LEFT_ROI,  img_w, img_h) & cv::Rect(0,0,img_w,img_h);
         cv::Rect rr = rel_to_rect(TEAM_RIGHT_ROI, img_w, img_h) & cv::Rect(0,0,img_w,img_h);
 
@@ -307,14 +400,12 @@ void OCRDetector::processFrame(const cv::Mat& frame)
         std::string right_team = resolve_team_name(ocr_team_name(frame(rr)), teamNames);
 
         if (!left_team.empty() && !right_team.empty()) {
-            leftTeamName  = left_team;
-            rightTeamName = right_team;
-            emit ocrLog(QString("Teams detected: %1 vs %2")
+            awaitingTeamConfirmation = true;
+            emit ocrLog(QString("Teams proposed: %1 vs %2 (awaiting confirmation)")
                         .arg(QString::fromStdString(left_team))
                         .arg(QString::fromStdString(right_team)));
-            emit teamsDetected(QString::fromStdString(left_team),
+            emit teamsProposed(QString::fromStdString(left_team),
                                QString::fromStdString(right_team));
-            teamDetected = true;
         }
     }
 

@@ -178,6 +178,13 @@ add_custom_command(TARGET Valorant-Vision POST_BUILD
     "$<TARGET_FILE_DIR:Valorant-Vision>/tessdata"
 )
 
+# Copy data folder (players.txt) next to the exe so WebScraper finds it on any machine
+add_custom_command(TARGET Valorant-Vision POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+    "${CMAKE_SOURCE_DIR}/data"
+    "$<TARGET_FILE_DIR:Valorant-Vision>/data"
+)
+
 # Adds id to agent icon file to .exe directory
 add_custom_command(
     TARGET ${PROJECT_NAME} POST_BUILD
