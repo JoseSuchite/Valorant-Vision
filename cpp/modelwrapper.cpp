@@ -14,6 +14,7 @@ ModelWrapper::~ModelWrapper() {
 
 void ModelWrapper::loop(std::string fileName) {
 
+	//What percent of the screen is the minimap at
 	const float LEFT_SIDE = 0.024;
 	const float RIGHT_SIDE = 0.24;
 	const float TOP_SIDE = 0.04;
@@ -34,18 +35,21 @@ void ModelWrapper::loop(std::string fileName) {
 			continue;
 		}
 
+		//Get dimensions of the frame
 		cv::Size s = frame.size();
 		int height = s.height, width = s.width;
 
+		//Crop out the minimap
 		cv::Rect ROI(LEFT_SIDE * width, TOP_SIDE * height, (RIGHT_SIDE - LEFT_SIDE) * width, (BOTTOM_SIDE - TOP_SIDE) * height);
 		cv::Mat croppedFrame = frame(ROI);
 
-
+		//Run the prediction on the minimap and get the results
 		model->predict(croppedFrame);
 		Eigen::MatrixXf results = model->getCurrentTracking();
 		//model->outputTrackingImageWithBoxesAndLabels(croppedFrame, results, "frames/" + std::to_string(frameID) + ".png");
 		//model->outputClassificationImageWithBoxesAndLabels(croppedFrame, results, 0.6, "frames/" + std::to_string(frameID) + ".png");
 
+		//Store the results
 		lock.lock();
 		data.push_back(results);
 		lock.unlock();

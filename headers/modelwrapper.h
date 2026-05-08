@@ -36,8 +36,9 @@ public:
 
 	void endProcessingLoop(); // Ends the processing loop if it's running, if not does nothing
 	void startProcessingLoop(std::string fileName, const int RUN_EVERY_N_FRAMES, const int FPS); // Takes in the file name that we want to process, how often we want to run the model, video FPS,and creates the thread for processing it
+
 	// Returns the data corresponding to the Nth frame of the video
-	// Note: pass in the actual frame in the video you want. The method will handle it's actually stored
+	// Note: pass in the actual frame in the video you want. The method will handle how it's actually stored
 	Eigen::MatrixXf getFrameData(const int NthFrame); 
 
 };

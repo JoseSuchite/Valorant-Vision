@@ -46,6 +46,7 @@ NeuralNetwork::NeuralNetwork(const T_CHAR *onnxFilePath, const int ROWS, const i
         outputNodeNamesCStyle.push_back(name.c_str());
     }
 
+    //Set up tracker (will use default parameters for now, but this will get changed will actually ran)
     try {
         tracker = new motcpp::trackers::ByteTrack(); // Set the tracker to the defaults for now
     }
@@ -87,7 +88,7 @@ std::vector<float> NeuralNetwork::prepareImage(const cv::Mat &imageBGR) {
     return imageVector;
 }
 
-//Takes in a cv image, runs a prediction on it, and update internals
+//Takes in a cv image, runs a prediction on it, and updates internals
 void NeuralNetwork::predict(cv::Mat imageBGR) {
 
     size_t input_tensor_size = 1 * 3 * ROWS * COLS;
@@ -103,6 +104,7 @@ void NeuralNetwork::predict(cv::Mat imageBGR) {
 
     std::vector<Ort::Value> outputTensor;
 
+    //Perform the actual prediction
     try {
         outputTensor = model->Run(Ort::RunOptions{ nullptr },
             inputNodeNamesCStyle.data(),
@@ -128,6 +130,7 @@ void NeuralNetwork::predict(cv::Mat imageBGR) {
     float *scoresArr = outputTensor[2].GetTensorMutableData<float>();
     size_t scoresLength = outputTensor[2].GetTensorTypeAndShapeInfo().GetElementCount();
 
+	//Store prediction as eigen matrix in the format of: x1, y1, x2, y2, confidence, ID
     currentPrediction = Eigen::MatrixXf(labelsLength, 6);
     for (int i = 0; i < labelsLength; i++) {
         currentPrediction(i, 0) = boxesArr[4 * i];
@@ -138,7 +141,7 @@ void NeuralNetwork::predict(cv::Mat imageBGR) {
         currentPrediction(i, 5) = labelsArr[i];
     }
 
-    //motcpp doesn't properly check for empty predictions
+    //motcpp doesn't properly check for empty predictions, so we check to make sure
     //this likely messes with the tracking, but realistically there should almost always be SOME prediction
     if (currentPrediction.rows() > 0) {
         cv::Mat resizedImg;
@@ -147,7 +150,7 @@ void NeuralNetwork::predict(cv::Mat imageBGR) {
             currentTracking = tracker->update(currentPrediction, resizedImg);
         }
         catch (...) {
-            std::cerr << "Tracker failed. Using previous frame data" << std::endl;
+            std::cerr << "Tracker failed. Using data from previous frame" << std::endl;
         }
     }
 }
@@ -204,8 +207,9 @@ void NeuralNetwork::outputTrackingImageWithBoxesAndLabels(const cv::Mat image, E
 }
 
 void NeuralNetwork::resetTracker(const int FPS) {
+
     delete tracker;
-    
+    //I would recommend just going to the motcpp repo and checking what each individual parameter does, as there are so many...
     tracker = new motcpp::trackers::ByteTrack(0.3f,
                                             80 * (30.0 / FPS),
                                             120,
@@ -220,27 +224,4 @@ void NeuralNetwork::resetTracker(const int FPS) {
                                             0.8f,
                                             80 * (30.0 / FPS),
                                             FPS);
-
-    /*tracker = new motcpp::trackers::DeepOCSort("osnet_x1_0_dukemtmcreid.onnx",
-                                                false,
-                                                false,
-                                                0.6f,
-                                                30,
-                                                50,
-                                                3,
-                                                0.2f,
-                                                true,
-                                                80,
-                                                "iou",
-                                                false,
-                                                4,
-                                                0.2f,
-                                                0.1f,
-                                                0.9f,
-                                                0.5f,
-                                                false,
-                                                false,
-                                                false,
-                                                0.8f,
-                                                0.1f);*/
 }
