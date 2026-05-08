@@ -51,6 +51,7 @@ class ImageGenerator:
                 else:
                     raise ValueError(f"Unsupported image format: {extension}")
 
+        # Loads each image file in a folder and stores it
         def load_results(folder_path, array, resize_factor=None):
             for path in os.listdir(folder_path):
                 path = os.path.join(folder_path, path)
@@ -92,6 +93,7 @@ class ImageGenerator:
 
         for _ in range(num_agents_to_draw):
 
+            # Load agent icon and apply transformations to it
             agent_icon, agent_name = random.choice(self.agent_icons)
             agent_icon, inner_r, crop_pad = self.square_to_circle_with_border(image=agent_icon)
             agent_icon = self.rotate_image_randomly(agent_icon, angle_range=(-5, 5))
@@ -130,7 +132,7 @@ class ImageGenerator:
             if result is not None:
                 minimap = result
 
-                # resize icon exactly the same way it was drawn (please change this later PLEASE)
+                # resize icon the same way it was drawn (please change this later)
                 scaled_icon = cv2.resize(agent_icon, resize_factor)
 
                 # Scale inner_r and crop_pad to match the resized icon
@@ -206,7 +208,7 @@ class ImageGenerator:
 
         return mask, center, radius
 
-    # Takes in a numpy array (image) and returns a circular version as a numpy array
+    # Takes in a numpy array (image) and returns a circular version with a random array coming out of it as a numpy array
     def square_to_circle_with_border(self, image: np.ndarray, border_color=None,
                                       direction_angle: float = None) -> np.ndarray:  # noqa: keep sig
         """
@@ -367,26 +369,6 @@ class ImageGenerator:
 
         return background
 
-    # Takes in a background image (should be a minimap) and draws bounding boxes based on the passed in positions
-    def draw_boxes_on_image(self, background, positions):
-
-        for position in positions:
-            x, y = position["coordinates"]
-            width = position["width"]
-            height = position["height"]
-
-            top_left = (x, y)
-            bottom_right = (x + width, y + height)
-
-            # This shouldn't be needed, but y'know.
-            if top_left[0] < 0 or top_left[1] < 0 or bottom_right[0] > background.shape[1] or bottom_right[1] > background.shape[0]:
-                continue
-
-            purple = (128, 0, 128)
-            cv2.rectangle(background, top_left, bottom_right, purple, 2)
-
-        return background
-
     def rotate_image_randomly(self, image, angle_range=(0, 360)):
         height, width = image.shape[:2]
         center = (width // 2, height // 2)
@@ -481,6 +463,26 @@ class ImageGenerator:
         
         return image
 
+    # Takes in a background image (should be a minimap) and draws bounding boxes based on the passed in positions. Used for manually checking if boxes are right
+    def draw_boxes_on_image(self, background, positions):
+
+        for position in positions:
+            x, y = position["coordinates"]
+            width = position["width"]
+            height = position["height"]
+
+            top_left = (x, y)
+            bottom_right = (x + width, y + height)
+
+            # This shouldn't be needed, but y'know.
+            if top_left[0] < 0 or top_left[1] < 0 or bottom_right[0] > background.shape[1] or bottom_right[1] > background.shape[0]:
+                continue
+
+            purple = (128, 0, 128)
+            cv2.rectangle(background, top_left, bottom_right, purple, 2)
+
+        return background
+
     # Takes in an image and a list of positions (as well as the file name) and creates the image file and saves the position data to later make the COCO file
     def output_image(self, image, positions, file_name, is_train=True):
 
@@ -504,7 +506,7 @@ class ImageGenerator:
         if not success:
             raise IOError(f"Failed to write image to {image_path}")
 
-
+        # Store image data in coco format
         self.image_id += 1
         image_entry = {
             "id": self.image_id,
@@ -514,6 +516,7 @@ class ImageGenerator:
         }
         self.coco_data["images"].append(image_entry)
 
+        # Add data of where everything is in the image to our coco data
         for position in positions:
             class_id = self.class_ids[position["name"]]
 
@@ -538,6 +541,7 @@ class ImageGenerator:
 
             self.coco_data["annotations"].append(annotation)
 
+    # Dumps coco data into a file and resets all information (like what # image we're on)
     def save_coco(self, is_train=True):
         split = "train" if is_train else "val"
         path = os.path.join("dataset", f"instances_{split}.json")
@@ -550,6 +554,7 @@ class ImageGenerator:
         self.annotation_id = 0
         self.image_id = 0
 
+    # Outputs a mapping of id to name so that we can figure out what the ids actually mean (used in the actual C++ application)
     def output_id_to_name_mapping(self):
 
         output = []
@@ -572,7 +577,7 @@ class ImageGenerator:
         minimap = self.scale_artifact(minimap, scale_range=(0.5, 1.0))
         minimap = self.apply_jpeg_compression(minimap, quality_range=(50, 100))
 
-        #minimap = self.make_random_invisible(minimap, percent_invisible=0.01)
+        #minimap = self.make_random_invisible(minimap, percent_invisible=0.01) # This one makes everything really ugly so I have it turned off
         minimap = cv2.GaussianBlur(minimap, (3, 3), 0) if random.random() < 0.5 else minimap
 
         # The next two could be helpful, but you'd need to recalculate the bounding boxes and I don't want to

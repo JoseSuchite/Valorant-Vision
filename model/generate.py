@@ -13,28 +13,34 @@ else:
 VAL_IMAGES_TO_MAKE = int(TRAIN_IMAGES_TO_MAKE / 4)
 
 if __name__ == "__main__":
+
     current_dir = os.getcwd()
     generator = ImageGenerator(agent_icon_path=current_dir+"/agent_icons", 
                             minimap_path=current_dir+"/map_layouts",
                             misc_icon_path=current_dir+"/misc_icons")
+
     print("Starting training image generation...")
 
     for i in range(TRAIN_IMAGES_TO_MAKE):
+
         if i % INTERVAL_BETWEEN_PRINTS == 0:
             print(f"\r{i}/{TRAIN_IMAGES_TO_MAKE} training images generated")
+
         data_name = f"{i:04d}"
         generator.generate_data(data_name, is_train=True)
+
     generator.save_coco(is_train=True)
 
     print("Finished generating training images")
     print("Starting validation image generation...")
 
     for i in range(VAL_IMAGES_TO_MAKE):
+
         if i % INTERVAL_BETWEEN_PRINTS == 0:
             print(f"\r{i}/{VAL_IMAGES_TO_MAKE} validation images generated")
+
         data_name = f"{i:04d}"
         generator.generate_data(data_name, is_train=False)
-
 
     print("Finished generating validation images")
     
