@@ -38,7 +38,7 @@ FetchContent_Declare(
     GIT_TAG main
 )
 FetchContent_MakeAvailable(motcpp)
-target_link_libraries(motcpp PUBLIC yaml-cpp)
+target_link_libraries(motcpp PUBLIC yaml-cpp onnxruntime::onnxruntime)
 
 
 # Your executable
